@@ -235,6 +235,19 @@ class ShapeFormationAlg : public Algorithm {
                    const QString mode = "h");
 };
 
+// immobilizedparticles.
+class ImmobilizedParticlesAlg : public Algorithm {
+    Q_OBJECT
+
+public:
+    ImmobilizedParticlesAlg();
+
+public slots:
+    void instantiate(const int numParticles = 70, const int numImmoParticles = 70,
+                     const int genExpExample = 0, const int numCoinFlips = 7);
+};
+
+
 class AlgorithmList {
  public:
   // Constructs a list of algorithms recognized by the simulator (for now, this

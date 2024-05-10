@@ -194,7 +194,7 @@ InfObjCoatingSystem::InfObjCoatingSystem(uint numParticles, double holeProb) {
   Node objPos;
   while (objNodes.size() < numParticles * 2) {
     // Insert a new object particle at the given position.
-    insert(new Object(objPos));
+    insert(new ImmoParticle(objPos));
     objNodes.insert(objPos);
 
     // Calculate the next object position, avoiding 'tunnels'. Do this using

@@ -46,7 +46,7 @@ class Simulator : public QObject {
 
   // Responds to GUI and script requests for statistics and metrics.
   int numParticles() const;
-  int numObjects() const;
+  int numImmoParticles() const;
   QVariant metrics() const;
 
   // Responds to the exportMetrics signal from the GUI and scripts by creating

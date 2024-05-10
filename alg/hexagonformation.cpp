@@ -72,11 +72,11 @@ void HexagonFormationParticle::activate() {
 
 int HexagonFormationParticle::headMarkColor() const {
   switch(_state) {
-    case State::Seed:      return 0x00ff00;
-    case State::Idle:      return -1;
-    case State::Follower:  return 0x0000ff;
-    case State::Root:      return 0xff0000;
-    case State::Retired:   return 0x000000;
+    case State::Seed:      return 0x00ff00;  // greem color
+    case State::Idle:      return -1;        //
+    case State::Follower:  return 0x0000ff;  // blue
+    case State::Root:      return 0xff0000;  // red
+    case State::Retired:   return 0x000000;   // black
     default:               return -1;
   }
 }

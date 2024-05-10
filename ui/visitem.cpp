@@ -5,12 +5,14 @@
 #include "ui/visitem.h"
 
 #include <cmath>
-
+#include <array>
 #include <QImage>
 #include <QMutexLocker>
 #include <QOpenGLFunctions_2_0>
 #include <QQuickWindow>
 #include <QRgb>
+#include <QtGlobal>
+
 
 // visualisation preferences
 static constexpr float targetFramesPerSecond = 60.0f;
@@ -50,7 +52,7 @@ void VisItem::focusOnCenterOfMass() {
     }
   }
 
-  for(const Object* obj: system->getObjects()) {
+  for(const ImmoParticle* obj: system->getImmoParticles()) {
       sum = sum + nodeToWorldCoord(obj->_node);
       numMassPoints++;
   }
@@ -70,6 +72,7 @@ void VisItem::focusOn(Node node) {
 void VisItem::setZoom(double zoom) {
   view.setZoom(zoom);
 }
+
 
 void VisItem::saveScreenshot(QString filePath) {
   window()->grabWindow().save(filePath);
@@ -113,7 +116,7 @@ void VisItem::paint() {
 
     drawParticles();
 
-    drawObjects();
+    drawImmoParticles();
   }
 }
 
@@ -161,6 +164,7 @@ void VisItem::drawGrid() {
   glfn->glVertex2d(view.left(), view.top());
   glfn->glEnd();
 }
+
 
 void VisItem::drawParticles() {
   particleTex->bind();
@@ -258,23 +262,138 @@ void VisItem::drawFromParticleTex(int index, const QPointF& pos) {
   glfn->glTexCoord2d(texOffset.x(), texOffset.y() + invTexSize);
   glfn->glVertex2d(pos.x() - halfQuadSideLength, pos.y() + halfQuadSideLength);
 }
-
-void VisItem::drawObjects() {
+/*
+void VisItem::drawImmoParticles() {
   glfn->glBegin(GL_QUADS);
 
-  std::deque<Object*> objects = system->getObjects();
-  for(auto t : objects) {
-      drawObject(*t);
+  std::deque<ImmoParticle*> immoparticles = system->getImmoParticles();
+  for(auto t : immoparticles) {
+      drawImmoParticle(*t);
   }
 
   glfn->glEnd();
 }
+*/
+void VisItem::drawImmoParticles() {
+    glfn->glBegin(GL_QUADS);
 
-void VisItem::drawObject(const Object& t) {
-  auto pos = nodeToWorldCoord(t._node);
-  glfn->glColor4d(0.0, 0.0, 0.0, 1.0);
-  drawFromParticleTex(39, pos);
+    std::deque<ImmoParticle*> immoparticles = system->getImmoParticles();
+    for (auto t : immoparticles) {
+        drawImmoParticle(*t);
+        drawBordersImmo(*t);
+    }
+
+    glfn->glEnd();
 }
+
+std::array<float, 18> createHexagon(float centerX, float centerY, float radius) {
+    std::array<float, 18> vertices;
+
+    // Angle between each point of the hexagon
+    float angleIncrement = 2.0f * M_PI / 6.0f;
+
+    for (int i = 0; i < 6; ++i) {
+        float angle = i * angleIncrement;
+        vertices[i * 3] = centerX + radius * cos(angle);  // x-coordinate
+        vertices[i * 3 + 1] = centerY + radius * sin(angle);  // y-coordinate
+        vertices[i * 3 + 2] = 0.0f;  // z-coordinate, if using 2D view
+    }
+
+    return vertices;
+}
+
+
+
+void VisItem::drawImmoParticle(const ImmoParticle& t) {
+    auto pos = nodeToWorldCoord(t._node);
+
+    // Use default color for immoParticles (e.g., red)
+    glfn->glColor4d(1.0, 0.0, 0.0, 1.0);
+
+    drawFromParticleTex(0, pos);
+
+    // Draw the border with a different color (e.g., blue with some transparency)
+    glfn->glColor4i(0, 0, 255, 128); // Blue with 50% alpha
+    drawBordersImmo(t);
+}
+
+std::array<int, 18> VisItem::drawBordersImmo(const ImmoParticle& t) {
+    auto pos = nodeToWorldCoord(t._node);
+
+    // Specify the border color directly
+    int borderColor = 0x000000; // Black color
+
+    glfn->glColor4i(qRed(borderColor) << 23, qGreen(borderColor) << 23, qBlue(borderColor) << 23, 180 << 23);
+    drawFromParticleTex(7, pos);
+
+}
+
+
+/*void VisItem::drawImmoParticles() {
+    glfn->glBegin(GL_QUADS);
+
+    std::deque<ImmoParticle*> immoparticles = system->getImmoParticles();
+    for (auto t : immoparticles) {
+        drawImmoParticle(*t);
+        //drawBorderAroundImmo(*t);
+    }
+
+    glfn->glEnd();
+}
+
+void VisItem::drawImmoParticle(const ImmoParticle& t) {
+    auto pos = nodeToWorldCoord(t._node);
+
+
+
+        // Use default color for immoParticles (e.g., red)
+        glfn->glColor4d(1.0, 0.0, 0.0, 1.0);
+
+
+    drawFromParticleTex(0, pos);
+        // Draw the border with a different color (e.g., blue with some transparency)
+        glfn->glColor4i(0, 0, 255, 128); // Blue with 50% alpha
+        drawBordersImmo(t);
+}
+
+std::array<int, 18> VisItem::drawBordersImmo(const ImmoParticle& t) {
+    auto pos = nodeToWorldCoord(t._node);
+    std::array<int, 18> result({-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1});
+
+    // Use a different border color for immoParticles (e.g., blue)
+    for (int i = 0; i < 6; i++) {
+        result[i * 3 + 2] = 0x0000FF; // Blue color
+    }
+    drawFromParticleTex(0, pos);
+    return result;
+}
+
+
+void VisItem::drawImmoParticle(const ImmoParticle& t) {
+    auto pos = nodeToWorldCoord(t._node);
+    glfn->glColor4d(1.0, 0.0, 0.0, 1.0);
+
+    drawFromParticleTex(0, pos);
+
+
+}
+*/
+
+
+/*
+ std::array<int, 18> VisItem::drawBordersImmo(const ImmoParticle& t) {
+    auto pos = nodeToWorldCoord(t._node);
+    std::array<int, 18> result({-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1});
+
+        for (int i = 0; i < 6; i++) {
+            result[i * 3 + 2] = 0x000000;
+        }
+    drawFromParticleTex(0, pos);
+    return result;
+
+}
+
+*/
 
 QPointF VisItem::nodeToWorldCoord(const Node& node) {
   return QPointF(node.x + 0.5 * node.y, node.y * triangleHeight);

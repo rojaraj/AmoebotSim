@@ -131,7 +131,7 @@ BallroomDemoSystem::BallroomDemoSystem(unsigned int numParticles) {
   std::vector<int> rhombusDirs = {0, 1, 3, 4};
   for (int dir : rhombusDirs) {
     for (int i = 0; i < sideLen; ++i) {
-      insert(new Object(boundNode));
+      insert(new ImmoParticle(boundNode));
       boundNode = boundNode.nodeInDir(dir);
     }
   }

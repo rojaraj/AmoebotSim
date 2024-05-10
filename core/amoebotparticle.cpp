@@ -130,6 +130,14 @@ void AmoebotParticle::pull(int label) {
   system.registerActivation(&neighbor);
 }
 
+void AmoebotParticle::makeHeadLabel(int label) {
+    if (isExpanded() && !isHeadLabel(label)) {
+        head = tail();
+        globalTailDir = (globalTailDir + 3) % 6;
+    }
+}
+
+
 bool AmoebotParticle::hasNbrAtLabel(int label) const {
   const Node neighboringNode = nbrNodeReachedViaLabel(label);
   return system.particleMap.find(neighboringNode) != system.particleMap.end();
@@ -155,7 +163,7 @@ bool AmoebotParticle::hasTailAtLabel(int label) {
 
 bool AmoebotParticle::hasObjectAtLabel(int label) const {
   const Node neighboringNode = nbrNodeReachedViaLabel(label);
-  return system.objectMap.find(neighboringNode) != system.objectMap.end();
+  return system.immoparticleMap.find(neighboringNode) != system.immoparticleMap.end();
 }
 
 bool AmoebotParticle::hasObjectNbr() const {
@@ -176,4 +184,8 @@ int AmoebotParticle::labelOfFirstObjectNbr(int startLabel) const {
 
 void AmoebotParticle::putToken(std::shared_ptr<Token> token) {
   tokens.push_back(token);
+}
+
+int AmoebotSystem::seedOrientation() const {
+    return _seedOrientation;
 }

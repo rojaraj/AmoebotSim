@@ -99,7 +99,7 @@ MetricsDemoSystem::MetricsDemoSystem(unsigned int numParticles, int counterMax) 
   Node boundNode(0, 0);
   for (int dir = 0; dir < 6; ++dir) {
     for (int i = 0; i < sideLen; ++i) {
-      insert(new Object(boundNode));
+      insert(new ImmoParticle(boundNode));
       boundNode = boundNode.nodeInDir(dir);
     }
   }

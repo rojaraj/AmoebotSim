@@ -20,6 +20,7 @@
 #include "alg/leaderelection.h"
 #include "alg/leaderelectionbyerosion.h"
 #include "alg/shapeformation.h"
+#include "alg/immobilizedparticles.h"
 
 Algorithm::Algorithm(QString name, QString signature)
     : _name(name),
@@ -265,7 +266,7 @@ void EnergyShapeAlg::instantiate(const int numParticles,
   } else if (transferRate <= 0) {
     emit log("transferRate must be > 0", true);
   } else {
-    emit setSystem(std::make_shared<EnergyShapeSystem>(
+    emit setSystem(std:: make_shared<EnergyShapeSystem>(
                      numParticles, numEnergyRoots, holeProb, capacity, demand,
                      transferRate));
   }
@@ -400,6 +401,31 @@ void ShapeFormationAlg::instantiate(const int numParticles,
   }
 }
 
+ImmobilizedParticlesAlg::ImmobilizedParticlesAlg() :
+    Algorithm("Hexagon Formation with Immobilized Particles", "immobilizedparticles") {
+    addParameter("# Particles", "10");
+    addParameter("# Immobilized Particles", "30");
+    addParameter("Generate Exp. Example", "0");
+    addParameter("# Coin Flips", "7");
+}
+
+void ImmobilizedParticlesAlg::instantiate(const int numParticles, const int numImmoParticles, const int genExpExample, const int numCoinFlips) {
+    if (numParticles <= 0) {
+        emit log("# particles must be > 0", true);
+    } else if (numImmoParticles < 0) {
+        emit log("# Immobilized particles must be >= 0", true);
+    } else if (genExpExample != 0 && genExpExample != 1) {
+        emit log("generate exp. example must be 0 or 1", true);
+    } else if (numCoinFlips <= 0) {
+        emit log("# coin flips must be > 1", true);
+    } else {
+        emit setSystem(std::make_shared<ImmobilizedParticleSystem>(numParticles, numImmoParticles, genExpExample, numCoinFlips));
+    }
+}
+
+
+
+
 AlgorithmList::AlgorithmList() {
   // Demo algorithms.
   _algorithms.push_back(new DiscoDemoAlg());
@@ -420,6 +446,9 @@ AlgorithmList::AlgorithmList() {
   _algorithms.push_back(new LeaderElectionAlg());
   _algorithms.push_back(new LeaderElectionByErosionAlg());
   _algorithms.push_back(new ShapeFormationAlg());
+
+  //Thesis
+  _algorithms.push_back(new ImmobilizedParticlesAlg());
 }
 
 AlgorithmList::~AlgorithmList() {

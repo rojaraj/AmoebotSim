@@ -62,8 +62,8 @@ int ScriptInterface::getNumParticles() {
   return sim.numParticles();
 }
 
-int ScriptInterface::getNumObjects() {
-  return sim.numObjects();
+int ScriptInterface::getNumImmoParticles() {
+  return sim.numImmoParticles();
 }
 
 void ScriptInterface::exportMetrics() {

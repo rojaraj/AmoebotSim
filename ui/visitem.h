@@ -15,7 +15,7 @@
 #include <QWheelEvent>
 
 #include "core/node.h"
-#include "core/object.h"
+#include "core/immoparticle.h"
 #include "core/particle.h"
 #include "core/system.h"
 #include "ui/glitem.h"
@@ -55,8 +55,11 @@ class VisItem : public GLItem {
   void drawBorders(const Particle& p);
   void drawBorderPoints(const Particle& p);
   void drawFromParticleTex(int index, const QPointF& pos);
-  void drawObjects();
-  void drawObject(const Object& t);
+  void drawImmoParticles();
+  void drawImmoParticle(const ImmoParticle& t);
+  void drawParticleWithBorder(const ImmoParticle& t);
+  std::array<int, 18> drawBordersImmo(const ImmoParticle& t);
+  //void drawHexagon(const QPointF& center, double radius, const QColor& color, bool isBorder);
 
   static QPointF nodeToWorldCoord(const Node& node);
   static Node worldCoordToNode(const QPointF& worldCord);

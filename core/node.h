@@ -10,7 +10,7 @@
 #define AMOEBOTSIM_CORE_NODE_H_
 
 #include <array>
-
+#include <vector>
 #include <QtGlobal>
 
 class Node {
@@ -30,7 +30,7 @@ class Node {
   // more information on global directions, see localparticle.h.
   Node nodeInDir(int dir) const;
 
-  int x, y;
+    int x, y;
 };
 
 // Comparator between two nodes. First compares the nodes' x-coordinates and, in

@@ -17,7 +17,7 @@
 #include <functional>
 #include <map>
 #include <memory>
-
+#include "core/immoparticle.h"
 #include "core/amoebotsystem.h"
 #include "core/localparticle.h"
 #include "core/node.h"
@@ -38,6 +38,11 @@ class AmoebotParticle : public LocalParticle, public RandomNumberGenerator {
   // Executes one particle activation. The '= 0' indicates that this is a pure
   // virtual function which must be overridden by any particle subclasses.
   virtual void activate() = 0;
+
+  // Default return value is false.
+  // Should be overwritten in subclasses that allow particles in an error state (fault-tolerance model) and
+  // return true if the particle is in an error state.
+  virtual bool isErrorParticle() const { return false;}
 
   // Returns the global direction from the head (respectively, tail) on which to
   // draw the direction markers (-1 indicates no marker). Meant to provide info
@@ -77,6 +82,14 @@ class AmoebotParticle : public LocalParticle, public RandomNumberGenerator {
   bool canPull(int label) const;
   void pull(int label);
 
+
+  // Function makeHeadLabel assures that the specified label is a head label.
+  // If the label is a head label, nothing is changed.
+  // If the label is not a head label, head and tail of the particle are swapped.
+  void makeHeadLabel(int label);
+
+
+
   // Gets a reference to the neighboring particle incident to the specified port
   // label. Crashes if no such particle exists at this label; consider using
   // hasNbrAtLabel() first if unsure.
@@ -101,11 +114,11 @@ class AmoebotParticle : public LocalParticle, public RandomNumberGenerator {
 
   // Returns the label of the first port incident to a neighboring particle
   // that satisfies the specified property, starting at the (optionally)
-  // specified label and continuing counter-clockwise.
+  // specified label and continuing counter-clockwise
   template<class ParticleType>
   int labelOfFirstNbrWithProperty(
       std::function<bool(const ParticleType&)> propertyCheck,
-      int startLabel = 0) const;
+      int startLabel = 0, bool ignoreErrorParticles = true) const;
 
   /* TOKEN IMPLEMENTATION & FUNCTIONS */
 
@@ -171,19 +184,23 @@ ParticleType& AmoebotParticle::nbrAtLabel(int label) const {
 template<class ParticleType>
 int AmoebotParticle::labelOfFirstNbrWithProperty(
     std::function<bool(const ParticleType&)> propertyCheck,
-    int startLabel) const {
-  const int labelLimit = isContracted() ? 6 : 10;
-  for (int labelOffset = 0; labelOffset < labelLimit; labelOffset++) {
-    const int label = (startLabel + labelOffset) % labelLimit;
-    if (hasNbrAtLabel(label)) {
-      const ParticleType& particle = nbrAtLabel<ParticleType>(label);
-      if (propertyCheck(particle)) {
-        return label;
-      }
-    }
-  }
+    int startLabel, bool ignoreErrorParticles) const {
 
-  return -1;
+    const int labelLimit = isContracted() ? 6 : 10;
+
+    for (int labelOffset = 0; labelOffset < labelLimit; labelOffset++) {
+        const int label = (labelLimit + startLabel + labelOffset) % labelLimit;
+        if (hasNbrAtLabel(label)) {
+            const ParticleType& particle = nbrAtLabel<ParticleType>(label);
+            if (!ignoreErrorParticles && particle.isErrorParticle()) {
+                return -1;
+            } else if (propertyCheck(particle)) {
+                return label;
+            }
+        }
+    }
+
+    return -1;
 }
 
 template<class TokenType>

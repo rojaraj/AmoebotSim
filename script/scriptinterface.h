@@ -38,14 +38,14 @@ class ScriptInterface : public QObject {
   void setStepDuration(const int ms);
   void runUntilTermination();
 
-  // Simulator metrics commands. getNumParticles and getNumObjects return the
+  // Simulator metrics commands. getNumParticles and getNumImmoParticles return the
   // number of particles and objects in the given instance, respectively.
   // exportMetrics writes the metrics to JSON. See simulator.h for further
   // discussion. getMetric returns either the current value (history = false)
   // or the historical data (history = true) of the metric with parameter-
   // defined name.
   int getNumParticles();
-  int getNumObjects();
+  int getNumImmoParticles();
   void exportMetrics();
   QVariant getMetric(QString name, bool history = false);
 

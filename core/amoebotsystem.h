@@ -16,7 +16,7 @@
 #include <QString>
 
 #include "core/metric.h"
-#include "core/object.h"
+#include "core/immoparticle.h"
 #include "core/system.h"
 #include "helper/randomnumbergenerator.h"
 
@@ -44,20 +44,20 @@ class AmoebotSystem : public System, public RandomNumberGenerator {
   // Returns the number of particles in the system.
   unsigned int size() const final;
 
-  // Returns the number of objects in the system.
-  unsigned int numObjects() const final;
+  // Returns the number of immobilized particles in the system.
+  unsigned int numImmoParticles() const final;
 
   // Returns a reference to the particle at the specified index of particles.
   const Particle& at(int i) const final;
 
-  // Returns a reference to the object list.
-  virtual const std::deque<Object*>& getObjects() const final;
+  // Returns a reference to the immobilized particle list.
+  virtual const std::deque<ImmoParticle*>& getImmoParticles() const final;
 
   // Inserts a particle or an object, respectively, into the system. A particle
   // can be contracted or expanded. Fails if the respective node(s) are already
   // occupied.
   void insert(AmoebotParticle* particle);
-  void insert(Object* object);
+  void insert(ImmoParticle* ImmoParticle);
 
   // Removes the specified particle from the system.
   void remove(AmoebotParticle* particle);
@@ -86,14 +86,24 @@ class AmoebotSystem : public System, public RandomNumberGenerator {
   // this JSON string can be found in the Usage documentation.
   const QString metricsAsJSON() const final;
 
+
+  // Currently used in the function updateBorderColors
+  // in the class ShapeFormationFaultTolerantParticle
+  // to draw the boundaries of the hexagon layers.
+  // Purely visualization related, i.e. the value is not used
+  // in the fault-tolerant hexagon shape formation algorithm.
+  int seedOrientation() const;
+
+
  protected:
   std::vector<AmoebotParticle*> particles;
   std::map<Node, AmoebotParticle*> particleMap;
   std::set<AmoebotParticle*> activatedParticles;
-  std::deque<Object*> objects;
-  std::map<Node, Object*> objectMap;
+  std::deque<ImmoParticle*> immoparticles;
+  std::map<Node, ImmoParticle*> immoparticleMap;
   std::vector<Count*> _counts;
   std::vector<Measure*> _measures;
+  int _seedOrientation;
 };
 
 #endif  // AMOEBOTSIM_CORE_AMOEBOTSYSTEM_H_

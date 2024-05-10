@@ -21,15 +21,16 @@ HEADERS += \
     alg/energyshape.h \
     alg/energysharing.h \
     alg/hexagonformation.h \
+    alg/immobilizedparticles.h \
     alg/infobjcoating.h \
     alg/leaderelectionbyerosion.h \
     alg/shapeformation.h \
     core/amoebotparticle.h \
     core/amoebotsystem.h \
+    core/immoparticle.h \
     core/localparticle.h \
     core/metric.h \
     core/node.h \
-    core/object.h \
     core/particle.h \
     core/simulator.h \
     core/system.h \
@@ -57,14 +58,15 @@ SOURCES += \
     alg/energyshape.cpp \
     alg/energysharing.cpp \
     alg/hexagonformation.cpp \
+    alg/immobilizedparticles.cpp \
     alg/infobjcoating.cpp \
     alg/leaderelectionbyerosion.cpp \
     alg/shapeformation.cpp \
     core/amoebotparticle.cpp \
     core/amoebotsystem.cpp \
+    core/immoparticle.cpp \
     core/localparticle.cpp \
     core/metric.cpp \
-    core/object.cpp \
     core/particle.cpp \
     core/simulator.cpp \
     core/system.cpp \

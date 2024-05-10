@@ -16,7 +16,7 @@
 
 #include "core/metric.h"
 #include "core/node.h"
-#include "core/object.h"
+#include "core/immoparticle.h"
 #include "core/particle.h"
 
 // System is forward declared to avoid a cyclic dependency with SystemIterator.
@@ -52,15 +52,15 @@ class System {
   // system subclasses.
   virtual unsigned int size() const = 0;
 
-  // Returns the number of objects in the system.
-  virtual unsigned int numObjects() const = 0;
+  // Returns the number of Immobilized Particles in the system.
+  virtual unsigned int numImmoParticles() const = 0;
 
   // Returns a reference to the particle at the specified index. Must be
   // overridden by any system subclasses.
   virtual const Particle& at(int i) const = 0;
 
-  // Returns a reference to the object list.
-  virtual const std::deque<Object*>& getObjects() const = 0;
+  // Returns a reference to the immobilizde particles list.
+  virtual const std::deque<ImmoParticle*>& getImmoParticles() const = 0;
 
   // STL-like begin and end functions for particle-accessing iterators.
   SystemIterator begin() const;

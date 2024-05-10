@@ -9,6 +9,7 @@
 
 #include "core/amoebotparticle.h"
 
+
 AmoebotSystem::AmoebotSystem() {
   _counts.push_back(new Count("# Rounds"));
   _counts.push_back(new Count("# Activations"));
@@ -21,10 +22,10 @@ AmoebotSystem::~AmoebotSystem() {
   }
   particles.clear();
 
-  for (auto t : objects) {
+  for (auto t : immoparticles) {
     delete t;
   }
-  objects.clear();
+  immoparticles.clear();
 
   for (auto c : _counts) {
     delete c;
@@ -55,21 +56,21 @@ unsigned int AmoebotSystem::size() const {
   return particles.size();
 }
 
-unsigned int AmoebotSystem::numObjects() const {
-  return objects.size();
+unsigned int AmoebotSystem::numImmoParticles() const {
+  return immoparticles.size();
 }
 
 const Particle& AmoebotSystem::at(int i) const {
   return *particles.at(i);
 }
 
-const std::deque<Object*>& AmoebotSystem::getObjects() const {
-  return objects;
+const std::deque<ImmoParticle*>& AmoebotSystem::getImmoParticles() const {
+  return immoparticles;
 }
 
 void AmoebotSystem::insert(AmoebotParticle* particle) {
   Q_ASSERT(particleMap.find(particle->head) == particleMap.end());
-  Q_ASSERT(objectMap.find(particle->head) == objectMap.end());
+  Q_ASSERT(immoparticleMap.find(particle->head) == immoparticleMap.end());
   Q_ASSERT(!particle->isExpanded() ||
            particleMap.find(particle->tail()) == particleMap.end());
 
@@ -80,12 +81,28 @@ void AmoebotSystem::insert(AmoebotParticle* particle) {
   }
 }
 
-void AmoebotSystem::insert(Object* object) {
-  Q_ASSERT(objectMap.find(object->_node) == objectMap.end());
-  Q_ASSERT(particleMap.find(object->_node) == particleMap.end());
+/*void AmoebotSystem::insert(ImmoParticle* immoparticle) {
+    // Ensure the node is not already in the map
+    Q_ASSERT(immoparticleMap.find(immoparticle->_node) == immoparticleMap.end());
+    Q_ASSERT(particleMap.find(immoparticle->_node) == particleMap.end());
 
-  objects.push_back(object);
-  objectMap[object->_node] = object;
+    // Declare 'ImmoParticles' if it's not declared elsewhere in the class or global scope
+    if (!ImmoParticles) {
+        // If it's a vector or list, initialize it
+        ImmoParticles = std::vector<ImmoParticle*>();
+    }
+    // Insert into 'ImmoParticles'
+    ImmoParticles.push_back(immoparticle);
+    // Add to the map
+    immoparticleMap[immoparticle->_node] = immoparticle;
+}*/
+
+void AmoebotSystem::insert(ImmoParticle* ImmoParticle) {
+  Q_ASSERT(immoparticleMap.find(ImmoParticle->_node) == immoparticleMap.end());
+  Q_ASSERT(particleMap.find(ImmoParticle->_node) == particleMap.end());
+
+  immoparticles.push_back(ImmoParticle);
+  immoparticleMap[ImmoParticle->_node] = ImmoParticle;
 }
 
 void AmoebotSystem::remove(AmoebotParticle* particle) {
