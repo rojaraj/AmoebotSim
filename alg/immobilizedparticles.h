@@ -3,20 +3,24 @@
 #define Immobilizedparticles_H
 #include <set>
 #include <QString>
-#include <bits/stl_list.h>
+//#include <bits/stl_list.h>
 #include "core/amoebotparticle.h"
 #include "core/amoebotsystem.h"
-
+#include <QOpenGLFunctions_2_0>
 class Immobilizedparticles : public AmoebotParticle {
 public:
     enum class State {
+        Immo,       // for immo particle
         Leader,
-        Idle,
-        Follower
-        //Immobilized,
-        //Delimiter
+        Idle,       // initial state
+        Follower,   // Member of the spanning forest but not on the forming hexagon.
+        Root,       // On the surface of the forming hexagon.
+        Retired,    // In the forming hexagon.
+        Cluster    // non-immobilized particle which is not a part of the spanning forest
+
+
     };
-    bool immobilized;
+
     // Constructs a new particle with a node position for its head, a global
     // compass direction from its head to its tail (-1 if contracted), an offset
     // for its local compass, a system which it belongs to and an initial state.
@@ -25,38 +29,16 @@ public:
 
     // Executes one particle activation.
     virtual void activate();
-    // virtual void tryToPassLeaderToken();
-    // virtual void processImmobilizedWakeUp();
-    // virtual void processImmobilizedOrDelimiter();
-    // virtual void processWakeUp();
-    // virtual void processPhase1();
-    // virtual void processPhase2();
-    // virtual void processPhase2PreliminaryAction();
-    // virtual void processPhase2Notification();
-    // virtual void processPhase2Advance();
-    // virtual void processPhase2AdvanceUpdated();
-    // virtual void processPhase2Merge();
-    // virtual void processPhase3();
-    // virtual void getLineParentParticleLabelForContractedParticle();
-    // virtual void getLineChildParticleLabel();
-    // virtual int nextClockwiseDir(int inputDir);
-    // virtual int nextCounterClockwiseDir(int inputDir);
 
-
-
-
-
-
-
-    bool tryToBecomeFollower();
-    bool isImmobilized() const;
-    bool hasImmobilizedNbr() const;
-    // Helper methods for the algorithm.
     virtual void tryToBecomeLeader();
-    //virtual void immobilize();
+    int nextClockwiseDir(int inputDir);
+    int nextCounterclockwiseDir(int inputDir);
 
     virtual void passLeaderToken(const int label);
     virtual void performMovement();
+
+    bool areAllClusterAndIdleParticlesFollowers();
+    virtual void performMovement2();
     virtual void updateBoolStates();
 
     virtual std::vector<int> randLabels();
@@ -108,11 +90,12 @@ public:
 
     // Checks whether this particle's state is one of the given states.
     bool isInState(std::initializer_list<State> states) const;
+    void setState(State newState);
 
 protected:
     // General state of this particle.
     State state;
-
+     QOpenGLFunctions_2_0* glfn;
     // Line recovery specific variables of this particle:
 
     // Movement direction markers for the Leader and Followers.
@@ -152,11 +135,17 @@ private:
 };
 
 class ImmobilizedParticleSystem : public AmoebotSystem  {
+
 public:
     // Constructs a system of ShapeFormationFaultTolerantParticles with an optionally specified
     // size (#particles) and immobility rate, i.e. the probability for each particle to be
     // immobilized in the initial configuration. The particles initially form a line.
     ImmobilizedParticleSystem(int numParticles = 75, int numImmoParticles = 75, int genExpExample = 0, int numCoinFlips = 7);
+    void printAllParticleStates() const;
+    void setParticlesToImmobilized();
+    const std::vector<AmoebotParticle*>& getParticles() const {
+        return particles;
+    }
 
     // Checks whether or not the system's run of the ShapeFormation formation
     // algorithm has terminated (all particles finished).
