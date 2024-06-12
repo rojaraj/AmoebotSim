@@ -8,14 +8,21 @@
 #include "core/amoebotsystem.h"
 #include <QOpenGLFunctions_2_0>
 class Immobilizedparticles : public AmoebotParticle {
+// private:
+//     bool activated;
+//     std::vector<Immobilizedparticles*> children;
+//     void buildTree();
+//     void activateTree();
+//     void processActivation();
+//     void addChild(Immobilizedparticles* child);
 public:
     enum class State {
         Immo,       // for immo particle
         Leader,
         Idle,       // initial state
         Follower,   // Member of the spanning forest but not on the forming hexagon.
-        Root,       // On the surface of the forming hexagon.
-        Retired,    // In the forming hexagon.
+        ClusterLead,       // On the surface of the forming hexagon.
+        ClusterMark,    // In the forming hexagon.
         Cluster    // non-immobilized particle which is not a part of the spanning forest
 
 
@@ -30,6 +37,12 @@ public:
     // Executes one particle activation.
     virtual void activate();
 
+
+    //NON-IMMO state change
+    //void changeStateOfNonImmobilizedParticles();
+    //Get neighbour labels
+    //virtual std::vector<int> getNbrLabels() const;
+
     virtual void tryToBecomeLeader();
     int nextClockwiseDir(int inputDir);
     int nextCounterclockwiseDir(int inputDir);
@@ -40,6 +53,8 @@ public:
     bool areAllClusterAndIdleParticlesFollowers();
     virtual void performMovement2();
     virtual void updateBoolStates();
+
+    virtual void updateMoveDir();
 
     virtual std::vector<int> randLabels();
 

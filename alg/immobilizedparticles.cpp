@@ -1,9 +1,13 @@
-﻿#include <set>
+﻿
+#include <set>
 #include <queue>
 #include <unistd.h>
+#include <random>
 #include "immobilizedparticles.h"
 #include <QtGlobal>
 #include <QOpenGLFunctions_2_0>
+#include <vector>
+#include <cstdio>
 
 Immobilizedparticles::Immobilizedparticles(const Node head,
                                            const int globalTailDir,
@@ -25,6 +29,8 @@ Immobilizedparticles::Immobilizedparticles(const Node head,
     _borderColors.fill(-1);
     _borderPointColors.fill(-1);
 }
+
+
 void Immobilizedparticles::activate() {
     printf("Activating particle. Current state: %d\n", state);
 
@@ -36,68 +42,109 @@ void Immobilizedparticles::activate() {
         } else if (isInState({State::Idle})) {
             printf("Particle is idle, trying to follow a neighbor.\n");
 
+            bool hasLeaderOrFollowerNeighbor = false;
+
             for (int label : randLabels()) {
                 if (hasNbrAtLabel(label)) {
                     auto& nbr = nbrAtLabel(label);
+                    printf("Follow dir: Neighbour:: %d\n", nbr.followDir);
+
                     if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir)))
                         || (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
                         followDir = labelToDir(label);
                         state = State::Follower;
                         printf("Following neighbor at label: %d\n", label);
-                        break;
-                    }
-                    else if (nbr.isInState({State::Immo}) || nbr.isInState({State::Idle}) || nbr.isInState({State::Cluster})) {
-                        state = State::Cluster;
-                        break;
+                        return;
+                    } else if (nbr.isInState({State::Leader}) || nbr.isInState({State::Follower})) {
+                        hasLeaderOrFollowerNeighbor = true;
                     }
                 }
+            }
+
+            if (!hasLeaderOrFollowerNeighbor) {
+                for (int label : randLabels()) {
+                    if (hasNbrAtLabel(label)) {
+                        auto& nbr = nbrAtLabel(label);
+                if (nbr.isInState({State::Immo}) || nbr.isInState({State::Idle}) || nbr.isInState({State::Cluster})) {
+                    state = State::Cluster;
+                    printf("No leader or follower neighbor found, changing state to Cluster.\n");
+                    break;
+                }
+                    }
+                }
+
+
+
             }
         } else if (isInState({State::Leader})) {
-            printf("Particle is a leader.\n");
-
             if (moveDir == -1) {
                 moveDir = randDir();
-                printf("Random move direction chosen: %d\n", moveDir);
             }
-
             if (!areAllClusterAndIdleParticlesFollowers()) {
                 printf("Waiting for all Cluster and Idle particles to become Followers.\n");
-                return;
-            }
 
-            if (isContracted() && !canExpand(dirToHeadLabel(moveDir))) {
-                printf("Cannot expand in current move direction: %d\n", moveDir);
-                bool changed = false;
-                for (int label : randLabels()) {
-                    moveDir = labelToDir(label);
-                    if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
-                        if (isExpanded()) {
-                            makeHeadLabel(label);
+            } else {
+
+                if (isContracted() && !canExpand(dirToHeadLabel(moveDir))) {
+                    bool changed = false;
+                    for (int label : randLabels()) {
+                        moveDir = labelToDir(label);
+                        if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
+                            if (isExpanded()) {
+                                makeHeadLabel(label);
+                            }
+                            changed = true;
+                            break;
                         }
-                        changed = true;
-                        printf("Changed move direction to: %d\n", moveDir);
-                        break;
                     }
-                }
-                if (!changed) {
-                    int label = labelOfFirstNbrInState({State::Idle, State::Follower});
-                    if (label >= 0) {
-                        passLeaderToken(label);
-                        moveDir = -1;
-                        printf("Passed leader token to label: %d\n", label);
-                    } else {
-                        printf("Leader is surrounded by ImmoParticles\n");
+
+                    if (!changed) {
+                        int label = labelOfFirstNbrInState({State::Idle, State::Follower});
+                        if (label >= 0) {
+                            passLeaderToken(label);
+                            moveDir = -1;
+                        } else {
+                            // This can only happen if the Leader is the only particle and it is
+                            // surrounded by objects.
+                            // So basically never, unless you are testing weird edge cases.
+                        }
                     }
                 }
             }
-        } else if (isInState({State::Immo})) {
+        }
+
+
+
+        /*else if(isInState({State::Follower})){
+            for (int label : {0, 1, 2, 3, 4, 5}) {
+
+                if (hasNbrAtLabel(label)) {
+                    auto& nbr = nbrAtLabel(label);
+                    // If the neighbor is not already a follower, make it a follower
+                    if (nbr.isInState({State::Idle,State::Cluster})) {
+                        printf(" Before Setting neighbor at label %d to follower.\n", label);
+
+                        nbr.state = State::Follower;
+                        nbr.followDir = labelToDir(label);
+                        printf("Setting neighbor at label %d to follower.\n", label);
+                    }
+                }
+                else{
+                    break;
+                }
+            }
+        }*/
+            else if (isInState({State::Immo})) {
             printf("Particle is immobile. Forwarding communication without changing state.\n");
             for (int label : randLabels()) {
                 if (hasNbrAtLabel(label)) {
                     auto& nbr = nbrAtLabel(label);
-                    if (nbr.isInState({State::Follower, State::Leader, State::Idle})) {
+                    if (nbr.isInState({State::Follower, State::Leader, State::Idle, State::Cluster})) {
+                         printf("Immo :: Communication forwarded to neighbor: Not follower? %d\n", areAllClusterAndIdleParticlesFollowers());
+                        if(!areAllClusterAndIdleParticlesFollowers()){
                         nbr.activate();
-                        printf("Communication forwarded to neighbor at label: %d\n", label);
+                        printf("Immo :: Communication forwarded to neighbor at label: %d\n", label);
+                        }
                     }
                 }
             }
@@ -106,23 +153,25 @@ void Immobilizedparticles::activate() {
             for (int label : randLabels()) {
                 if (hasNbrAtLabel(label)) {
                     auto& nbr = nbrAtLabel(label);
-                    if (nbr.isInState({State::Cluster, State::Immo}) && isInState({State::Cluster})) {
-                        performMovement2();
-                        if (state != State::Cluster) {
-                            break;
-                        }
-                    }
 
                     if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir)))
                         || (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
                         followDir = labelToDir(label);
                         state = State::Follower;
                         printf("Following neighbor at label - Try 2: %d\n", label);
-                        break;
+                        return;
+                    }
+                    else if (nbr.isInState({State::Cluster, State::Immo})) {
+                        printf("Performing Movement 2\n");
+                        performMovement2();
+                        if (state != State::Cluster) {
+                            return;
+                        }
                     }
                 }
             }
         }
+
 
         if (!isInState({State::Idle, State::Immo, State::Cluster})) {
             performMovement();
@@ -137,6 +186,7 @@ void Immobilizedparticles::activate() {
         printf("Unknown exception occurred.\n");
     }
 }
+
 
 
 int Immobilizedparticles::nextClockwiseDir(int inputDir) {
@@ -242,6 +292,8 @@ void Immobilizedparticles::performMovement() {
     } else if (isInState({State::Leader}) && isContracted() && !(freeState && lineState) && canExpand(dirToHeadLabel(moveDir))) {
         printf("Expanding towards move direction: %d\n", moveDir);
         expand(dirToHeadLabel(moveDir));
+    }else{
+        printf(" I am dead");
     }
     updateBoolStates();
     updateBorderColors();
@@ -257,14 +309,23 @@ bool Immobilizedparticles::areAllClusterAndIdleParticlesFollowers() {
     for (const auto& particle : immobilizedSystem->getParticles()) {
         auto* immobileParticle = dynamic_cast<Immobilizedparticles*>(particle);
         if (immobileParticle) {
-            if (immobileParticle->isInState({State::Cluster, State::Idle}) && !immobileParticle->isInState({State::Follower})) {
+            if (immobileParticle->isInState({State::Cluster, State::Idle})) {
                 return false;
             }
+
         }
     }
     return true;
 }
 
+void Immobilizedparticles::updateMoveDir() {
+    moveDir = labelOfFirstNbrInState({State::Follower, State::Leader});
+    while (hasNbrAtLabel(moveDir) && (nbrAtLabel(moveDir).state == State::Follower ||
+                                      nbrAtLabel(moveDir).state == State::Leader))
+    {
+        moveDir = (moveDir + 5) % 6;
+    }
+}
 
 
 
@@ -273,992 +334,89 @@ bool Immobilizedparticles::areAllClusterAndIdleParticlesFollowers() {
 void Immobilizedparticles::performMovement2() {
     State originalState = state;
     Node originalHead = head;
+    const std::vector<int>& headLabels = this->headLabels();
 
-    int dir = 0;
+    // Set up the random number generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, headLabels.size() - 1);
 
-    int iterationCount = 0; // Counter variable to limit iterations
+    const int maxIterations = 100; // Maximum number of iterations to prevent infinite loop
+    int iterationCount = 0;
 
-    while (iterationCount < 12) { // Limit iterations to avoid infinite loops
-        int label = dirToHeadLabel(dir);
+    while (iterationCount < maxIterations) {
+        iterationCount++;
 
-        // Ensure the label is valid before proceeding
-        if (label < 0 || label >= 6) {
-            dir = nextClockwiseDir(dir);
-            iterationCount++;
-            continue;
-        }
+        // Randomly choose a direction from the head labels
+        int randomIndex = dis(gen);
+        int elem = headLabels[randomIndex];
+        printf("Randomly chosen head label: %d\n", elem);
 
-        if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
-            moveDir = dir;
-            if (canExpand(moveDir)) {
-                expand(moveDir);
-                printf("Expanding in clockwise direction to label: %d\n", label);
+        // Check if the randomly chosen direction is free
+        if (!hasNbrAtLabel(elem) && !hasObjectAtLabel(elem)) {
+            expand(elem);
+            printf("Expanding to randomly chosen free slot at label: %d\n", elem);
 
-                bool connected = false;
-                int checkDir = nextCounterclockwiseDir(dir);
+            bool connected = false;
 
-                const std::vector<int>& headLabels = this->headLabels();
-                for (int elem : headLabels) {
-                    printf("%d ", elem);
-                    if (hasNbrAtLabel(elem)) {
-                        auto& nbr = nbrAtLabel(elem);
-                        if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir)))
-                            || (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
-                            followDir = labelToDir(label);
-                            state = State::Follower;
-                            printf("Following neighbor at label: %d\n", label);
-                            break;
-                        }
-                        else if (nbr.isInState({State::Leader, State::Follower})){
-                            connected = true;
-                            printf("Still Connected :D\n");
-                            break;
-                        }
-                        else {
-                            connected = true;
-                            printf("Still Connected :D\n");
-                            //dir=0;
-
-                        }
+            const std::vector<int>& headLabelsNbr = this->headLabels();
+            for (int elem2 : headLabelsNbr) {
+                printf("Checking neighbor at head label: %d\n", elem2);
+                if (hasNbrAtLabel(elem2)) {
+                    auto& nbr = nbrAtLabel(elem2);
+                    if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir))) ||
+                        (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
+                        followDir = labelToDir(elem2);
+                        state = State::Follower;
+                        connected = true;
+                        printf("Following neighbor at label: %d\n", elem);
+                        break;
+                    } else if (nbr.isInState({State::Leader, State::Follower})) {
+                        connected = true;
+                        followDir = labelToDir(elem2);
+                        //followDir = labelOfFirstNbrInState({State::Leader, State::Follower});
+                        printf("Still connected to leader/follower.\n");
+                        break;
+                    } else if (nbr.isInState({State::Cluster})) {
+                        connected = false;
+                    } else {
+                        connected = true;
+                        followDir = labelOfFirstNbrInState({State::Leader, State::Follower});
+                        printf("Still connected to leader/follower.\n");
                     }
-                }
-                printf("\n");
-
-                if (connected) {
-                    contractTail();
-                    printf("Expansion successful. Contracting tail.\n");
-                    break;
-                } else {
-                    printf("Expansion to label: %d would disconnect, backtracking.\n", label);
-                    if (isExpanded()) {
-                        contractHead();
-                        // Update the particle's state and position
-                    }
-                    state = originalState;
-                    head = originalHead;
-
-                    printf("Backtracking.%d\n", headMarkDir());
                 }
             }
+
+            if (connected) {
+                contractTail();
+                printf("Expansion successful. Contracting tail.\n");
+                break;
+            } else {
+                printf("Expansion to label: %d would disconnect, backtracking.\n", elem);
+                if (isExpanded()) {
+                    contractHead();
+                }
+                state = originalState;
+                head = originalHead;
+                printf("Backtracking to original state.\n");
+            }
         }
-        dir = randDir();
-        iterationCount++;
-        printf("Code reached here.\n");
+
+        if (isInState({State::Cluster})) {
+            continue;
+        }
     }
+
+    if (iterationCount >= maxIterations) {
+        printf("Maximum iterations reached. Exiting to prevent infinite loop.\n");
+    }
+
     updateBoolStates();
     updateBorderColors();
     printf("Performed movement 2.\n");
 }
 
 
-
-// #include <set>
-// #include <queue> // Include this to use std::queue
-// #include <unistd.h> // For sleep function
-// #include "immobilizedparticles.h"
-// #include <QtGlobal>
-// #include <QOpenGLFunctions_2_0>
-
-
-
-// Immobilizedparticles::Immobilizedparticles(const Node head,
-//                                            const int globalTailDir,
-//                                            const int orientation,
-//                                            AmoebotSystem& system,
-//                                            State state)
-//     : AmoebotParticle(head, globalTailDir, orientation, system),
-//     state(state),
-//     moveDir(-1),
-//     followDir(-1),
-//     leaderToken(false),
-//     tokenForwardDir(-1),
-//     tokenCurrentDir(-1),
-//     passForward(false),
-//     freeState(false),
-//     lineState(false),
-//     _borderColorsSet(false)
-// {
-//     _borderColors.fill(-1);
-//     _borderPointColors.fill(-1);
-// }
-
-// void Immobilizedparticles::activate() {
-
-
-//     printf("Activating particle. Current state: %d\n", state);
-
-
-//     if (leaderToken) {
-//         printf("Particle has received the leader token.\n");
-
-//         tryToBecomeLeader();
-//         return;
-//     } else if (isInState({State::Idle})) {
-//         printf("Particle is idle, trying to follow a neighbor.\n");
-//             //comment
-//         for (int label : randLabels()) {
-//             if (hasNbrAtLabel(label)) {
-//                 auto& nbr = nbrAtLabel(label);
-//                 if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir)))
-//                     || (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
-//                     //nbr.dirToHeadLabel(nbr.followDir): Gets the label in the direction the neighbor is following.
-//                     //pointsAtMe(nbr, ...): Checks if the given label direction points at the current particle.
-//                     followDir = labelToDir(label);
-//                     state = State::Follower;
-//                     printf("Following neighbor at label: %d\n", label);
-//                         //comment
-//                     break;
-//                 }
-//                 else if (nbr.isInState({State::Immo})|| nbr.isInState({State::Idle}))  {
-//                     state = State::Cluster;
-//                     break;
-//                 }
-//                 else if (nbr.isInState({State::Cluster}))  {
-//                     state = State::Cluster;
-//                     break;
-//                 }
-//                 //     // Array of labels corresponding to clockwise directions
-//                 //     std::vector<int> clockwiseLabels = {1, 2, 3, 4, 5, 0}; // Adjust this based on your specific label system
-
-//                 //     // Iterate through each label in a clockwise manner
-//                 //     for (int label : clockwiseLabels) {
-
-//                 //         int dir = labelToDir(label);
-//                 //         // Convert label to direction
-//                 //         if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
-//                 //             moveDir = dir; // Set the move direction to the free position
-//                 //             //int targetLabel = dirToHeadLabel(moveDir);
-//                 //             if (canExpand(moveDir)) { // Ensure expansion is possible
-
-//                 //                 // Backup current state in case we need to backtrack
-//                 //                 auto originalState = state;
-//                 //                 auto originalHead = head;
-
-//                 //                 // Expand to the free position
-//                 //                 expand(moveDir);
-//                 //                 printf("Expanding in clockwise direction to label: %d\n", label);
-
-//                 //                 bool connected = false;
-//                 //                 for (int neighborLabel : clockwiseLabels) {
-//                 //                     if ( hasNbrAtLabel(neighborLabel)) {
-//                 //                         connected = true;
-//                 //                         break;
-//                 //                     }
-//                 //                 }
-
-//                 //                 // If the particle is still connected, contract the tail
-//                 //                 if (connected) {
-//                 //                     contractTail();
-//                 //                     printf("Expansion successful. Contracting tail.\n");
-//                 //                     break; // Exit the loop after finding the first free position
-//                 //                 } else {
-//                 //                     // Backtrack to original state if disconnected
-//                 //                     printf("Expansion to label: %d would disconnect, backtracking.\n", label);
-
-//                 //                     // Revert the expansion to original state
-//                 //                     contractTail(); // Ensure the particle is in its initial state before re-expansion
-//                 //                     printf("Contracted \n");
-//                 //                     // Undo the expansion
-//                 //                     int moveDirInverted = (dir + 3) % 6;
-
-//                 //                     expand(moveDirInverted); // Expand back to the original position
-//                 //                     break;
-//                 //                     // Restore original state
-//                 //                     state = originalState;
-//                 //                     head = originalHead;
-//                 //                 }
-//                 //             }
-//                 //         }
-//                 //     }
-//                 // }
-
-
-
-
-
-//             }
-//         }
-//     } else if (isInState({State::Leader})) {
-//         printf("Particle is a leader.\n");
-//             //comment
-//         if (moveDir == -1) {
-//             moveDir = randDir();
-//             printf("Random move direction chosen: %d\n", moveDir);
-//                 //comment
-//         }
-//         if (isContracted() && !canExpand(dirToHeadLabel(moveDir))) {
-//             printf("Cannot expand in current move direction: %d\n", moveDir);
-//                 //comment
-//             bool changed = false;
-//             for (int label : randLabels()) {
-//                 moveDir = labelToDir(label);
-//                 if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
-//                     if (isExpanded()) {
-//                         makeHeadLabel(label);
-//                     }
-//                     changed = true;
-//                     printf("Changed move direction to: %d\n", moveDir);
-//                         //comment
-//                     break;
-//                 }
-//             }
-//             if (!changed) {
-//                 int label = labelOfFirstNbrInState({State::Idle, State::Follower});
-//                 if (label >= 0) {
-//                     passLeaderToken(label);
-//                     moveDir = -1;
-//                     printf("Passed leader token to label: %d\n", label);
-//                         //comment
-//                 } else {
-//                     printf("Leader is surrounded by ImmoParticles\n");
-//                         //comment
-//                 }
-//             }
-//         }
-//     }
-//     else if (isInState({State::Immo})) {
-//         printf("Particle is immobile. Forwarding communication without changing state.\n");
-//         // Forward communication to neighbors without changing state
-//         for (int label : randLabels()) {
-//             if (hasNbrAtLabel(label)) {
-//                 auto& nbr = nbrAtLabel(label);
-//                 // Check if neighbor is suitable to forward communication
-//                 if (nbr.isInState({State::Follower, State::Leader, State::Idle})) {
-//                     // Forward communication to neighbor
-//                     nbr.activate();
-//                     printf("Communication forwarded to neighbor at label: %d\n", label);
-//                     // Add any additional handling or logging here
-//                 }
-//                 // else if(nbr.isInState({State::Immo})){
-//                 //     nbr.activate();
-//                 //     break;
-
-//                 // }
-
-//             }
-
-//         }
-
-//     }
-//     else if (isInState({State::Cluster})) {
-//         printf("Particle is Cluster. Forwarding communication without changing state.\n");
-//         // Forward communication to neighbors without changing state
-//         for (int label : randLabels()) {
-//             if (hasNbrAtLabel(label)) {
-//                 auto& nbr = nbrAtLabel(label);
-//                 if(!nbr.isInState({State::Cluster, State::Immo})){
-//                     performMovement2();
-//                     }
-//                 }
-
-//                 }
-//             }
-
-//     if (!isInState({State::Idle})) {
-//         performMovement();
-//     }
-//     auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
-//     if (immobilizedSystem) {
-
-//         immobilizedSystem->printAllParticleStates();
-//     }
-// }
-
-// int Immobilizedparticles::nextClockwiseDir(int inputDir) {
-//     return (inputDir + 1) % 6;
-// }
-
-// int Immobilizedparticles::nextCounterclockwiseDir(int inputDir) {
-//     return (inputDir - 1 + 6) % 6;
-// }
-
-
-// void Immobilizedparticles::tryToBecomeLeader() {
-//     printf("Trying to become leader.\n");
-//         //comment
-//     for (int label : randLabels()) {
-//         moveDir = labelToDir(label);
-//         if ((isExpanded() && !hasNbrAtLabel(label) && !hasObjectAtLabel(label)) || canExpand(labelToDir(label))) {
-//             if (isExpanded()) {
-//                 makeHeadLabel(label);
-//             }
-//             state = State::Leader;
-//             leaderToken = false;
-//             tokenForwardDir = -1;
-//             tokenCurrentDir = -1;
-//             passForward = false;
-//             updateBorderPointColors(); // Only necessary for the visualisation.
-//             printf("Became leader. New move direction: %d\n", moveDir);
-//                 //comment
-//             return;
-//         }
-//     }
-
-//     moveDir = -1;
-//     printf("Could not become leader, passing on leader token.\n");
-//         //comment
-
-//     int label = 0;
-//     for (int l : uniqueLabels()) {
-//         if (labelToDir(l) == tokenCurrentDir) {
-//             label = l;
-//         }
-//     }
-
-//     int numLabels = isContracted() ? 6 : 10;
-
-//     if (passForward) {
-//         while (hasObjectAtLabel(label)) {
-//             label = (label + 1) % numLabels;
-//             passForward = false;
-//         }
-//     } else {
-//         do {
-//             label = (label - 1 + numLabels) % numLabels;
-//         } while (!hasObjectAtLabel(label));
-//         while (hasObjectAtLabel(label)) {
-//             label = (label + 1) % numLabels;
-//         }
-//     }
-
-//     passLeaderToken(label);
-// }
-
-// void Immobilizedparticles::passLeaderToken(const int label) {
-//     if (isExpanded()) {
-//         makeHeadLabel(label);
-//     }
-
-//     state = State::Follower;
-//     followDir = labelToDir(label);
-//     if (tokenForwardDir < 0) {
-//         passForward = true;
-//         tokenForwardDir = followDir;
-//     }
-
-//     auto& nbr = nbrAtLabel(label);
-//     nbr.leaderToken = true;
-//     nbr.tokenForwardDir = dirToNbrDir(nbr, tokenForwardDir);
-//     nbr.tokenCurrentDir = dirToNbrDir(nbr, followDir);
-//     nbr.passForward = passForward;
-//     if (nbr.tokenForwardDir == nbr.tokenCurrentDir && tokenForwardDir != tokenCurrentDir) {
-//         if (randBool()) {
-//             nbr.passForward = true;
-//         }
-//     }
-//     nbr.updateBorderPointColors(); // Only necessary for the visualisation.
-
-//     leaderToken = false;
-//     tokenForwardDir = -1;
-//     tokenCurrentDir = -1;
-//     passForward = false;
-//     updateBorderPointColors(); // Only necessary for the visualisation.
-
-//     printf("Passed leader token to neighbor at label: %d\n", label);
-//         //comment
-// }
-
-// void Immobilizedparticles::performMovement() {
-//     if (isExpanded() && isInState({State::Follower, State::Leader}) && !hasBlockingTailNbr()) {
-//         printf("Contracting tail.\n");
-//             //comment
-//         contractTail();
-//     } else if (isContracted() && isInState({State::Follower}) && hasTailAtLabel(dirToHeadLabel(followDir))) {
-//         printf("Expanding towards follow direction: %d\n", followDir);
-//             //comment
-//         int followLabel = dirToHeadLabel(followDir);
-//         auto& nbr = nbrAtLabel(followLabel);
-//         int nbrContractionDir = nbrDirToDir(nbr, (nbr.tailDir() + 3) % 6);
-//         push(followLabel);
-//         followDir = nbrContractionDir;
-//     } else if (isInState({State::Leader}) && isContracted() && !(freeState && lineState) && canExpand(dirToHeadLabel(moveDir))) {
-//         printf("Expanding towards move direction: %d\n", moveDir);
-//             //comment
-//         expand(dirToHeadLabel(moveDir));
-//     }
-//     updateBoolStates();
-//     updateBorderColors(); // Only necessary for the visualisation.
-//     printf("Performed movement.\n");
-//         //comment
-// }
-
-// void Immobilizedparticles::performMovement2() {
-//     // State originalState = state;
-//     // Node originalHead = head;
-//     // int dir = 0;  // Starting direction, can be any valid initial direction.
-
-//     // for (int i = 0; i < 6; ++i) {
-//     //     int label = dirToHeadLabel(dir);
-
-//     //     if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
-//     //         moveDir = dir;
-//     //         if (canExpand(moveDir)) {
-//     //             expand(moveDir);
-//     //             printf("Expanding in clockwise direction to label: %d\n", label);
-
-//     //             bool connected = false;
-//     //             int checkDir = dir;
-
-//     //             for (int j = 0; j < 6; ++j) {
-//     //                 int neighborLabel = dirToHeadLabel(checkDir);
-//     //                 if (hasNbrAtLabel(neighborLabel)) {
-//     //                     auto& nbr = nbrAtLabel(neighborLabel);
-//     //                     if (nbr.isInState({State::Leader, State::Follower})) {
-//     //                         state = State::Follower;
-//     //                         followDir = checkDir;
-//     //                         connected = true;
-//     //                         printf("Connected to neighbor at label: %d and changed state to Follower.\n", neighborLabel);
-//     //                         break;
-//     //                     }
-//     //                 }
-//     //                 checkDir = nextClockwiseDir(checkDir);
-//     //             }
-
-//     //             if (connected) {
-//     //                 contractTail();
-//     //                 printf("Expansion successful. Contracting tail.\n");
-//     //                 break;
-//     //             } else {
-//     //                 printf("Expansion to label: %d would disconnect, backtracking.\n", label);
-//     //                 contractTail();
-//     //                 int moveDirInverted = nextCounterclockwiseDir(nextCounterclockwiseDir(dir));
-//     //                 expand(moveDirInverted);
-//     //                 state = originalState;
-//     //                 head = originalHead;
-//     //             }
-//     //         }
-//     //     }
-//     //     dir = nextClockwiseDir(dir);
-//     // }
-
-//     //updateBoolStates();
-//     //updateBorderColors(); // Only necessary for the visualization.
-//     printf("Performed movement 2.\n");
-// }
-
-// #include <set>
-// #include <queue> // Include this to use std::queue
-// #include <unistd.h> // For sleep function
-// #include "immobilizedparticles.h"
-// #include <QtGlobal>
-// #include <QOpenGLFunctions_2_0>
-
-
-
-// Immobilizedparticles::Immobilizedparticles(const Node head,
-//                                            const int globalTailDir,
-//                                            const int orientation,
-//                                            AmoebotSystem& system,
-//                                            State state)
-//     : AmoebotParticle(head, globalTailDir, orientation, system),
-//     state(state),
-//     moveDir(-1),
-//     followDir(-1),
-//     leaderToken(false),
-//     tokenForwardDir(-1),
-//     tokenCurrentDir(-1),
-//     passForward(false),
-//     freeState(false),
-//     lineState(false),
-//     _borderColorsSet(false)
-// {
-//     _borderColors.fill(-1);
-//     _borderPointColors.fill(-1);
-// }
-
-// void Immobilizedparticles::activate() {
-
-
-//     printf("Activating particle. Current state: %d\n", state);
-
-
-//     if (leaderToken) {
-//         printf("Particle has received the leader token.\n");
-
-//         tryToBecomeLeader();
-//         return;
-//     } else if (isInState({State::Idle})) {
-//         printf("Particle is idle, trying to follow a neighbor.\n");
-//          //comment
-//         for (int label : randLabels()) {
-//             if (hasNbrAtLabel(label)) {
-//                 auto& nbr = nbrAtLabel(label);
-//                 if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir)))
-//                     || (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
-//                     //nbr.dirToHeadLabel(nbr.followDir): Gets the label in the direction the neighbor is following.
-//                     //pointsAtMe(nbr, ...): Checks if the given label direction points at the current particle.
-//                     followDir = labelToDir(label);
-//                     state = State::Follower;
-//                     printf("Following neighbor at label: %d\n", label);
-//                      //comment
-//                     break;
-//                 }
-//                 else if (nbr.isInState({State::Immo})) {
-//                     break;
-//                 }
-//                 //     // Array of labels corresponding to clockwise directions
-//                 //     std::vector<int> clockwiseLabels = {1, 2, 3, 4, 5, 0}; // Adjust this based on your specific label system
-
-//                 //     // Iterate through each label in a clockwise manner
-//                 //     for (int label : clockwiseLabels) {
-
-//                 //         int dir = labelToDir(label);
-//                 //         // Convert label to direction
-//                 //         if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
-//                 //             moveDir = dir; // Set the move direction to the free position
-//                 //             //int targetLabel = dirToHeadLabel(moveDir);
-//                 //             if (canExpand(moveDir)) { // Ensure expansion is possible
-
-//                 //                 // Backup current state in case we need to backtrack
-//                 //                 auto originalState = state;
-//                 //                 auto originalHead = head;
-
-//                 //                 // Expand to the free position
-//                 //                 expand(moveDir);
-//                 //                 printf("Expanding in clockwise direction to label: %d\n", label);
-
-//                 //                 bool connected = false;
-//                 //                 for (int neighborLabel : clockwiseLabels) {
-//                 //                     if ( hasNbrAtLabel(neighborLabel)) {
-//                 //                         connected = true;
-//                 //                         break;
-//                 //                     }
-//                 //                 }
-
-//                 //                 // If the particle is still connected, contract the tail
-//                 //                 if (connected) {
-//                 //                     contractTail();
-//                 //                     printf("Expansion successful. Contracting tail.\n");
-//                 //                     break; // Exit the loop after finding the first free position
-//                 //                 } else {
-//                 //                     // Backtrack to original state if disconnected
-//                 //                     printf("Expansion to label: %d would disconnect, backtracking.\n", label);
-
-//                 //                     // Revert the expansion to original state
-//                 //                     contractTail(); // Ensure the particle is in its initial state before re-expansion
-//                 //                     printf("Contracted \n");
-//                 //                     // Undo the expansion
-//                 //                     int moveDirInverted = (dir + 3) % 6;
-
-//                 //                     expand(moveDirInverted); // Expand back to the original position
-//                 //                     break;
-//                 //                     // Restore original state
-//                 //                     state = originalState;
-//                 //                     head = originalHead;
-//                 //                 }
-//                 //             }
-//                 //         }
-//                 //     }
-//                 // }
-
-
-
-
-
-//             }
-//         }
-//     } else if (isInState({State::Leader})) {
-//         printf("Particle is a leader.\n");
-//          //comment
-//         if (moveDir == -1) {
-//             moveDir = randDir();
-//             printf("Random move direction chosen: %d\n", moveDir);
-//              //comment
-//         }
-//         if (isContracted() && !canExpand(dirToHeadLabel(moveDir))) {
-//             printf("Cannot expand in current move direction: %d\n", moveDir);
-//              //comment
-//             bool changed = false;
-//             for (int label : randLabels()) {
-//                 moveDir = labelToDir(label);
-//                 if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
-//                     if (isExpanded()) {
-//                         makeHeadLabel(label);
-//                     }
-//                     changed = true;
-//                     printf("Changed move direction to: %d\n", moveDir);
-//                      //comment
-//                     break;
-//                 }
-//             }
-//             if (!changed) {
-//                 int label = labelOfFirstNbrInState({State::Idle, State::Follower});
-//                 if (label >= 0) {
-//                     passLeaderToken(label);
-//                     moveDir = -1;
-//                     printf("Passed leader token to label: %d\n", label);
-//                      //comment
-//                 } else {
-//                     printf("Leader is surrounded by ImmoParticles\n");
-//                      //comment
-//                 }
-//             }
-//         }
-//     }
-//     else if (isInState({State::Immo})) {
-//         printf("Particle is immobile. Forwarding communication without changing state.\n");
-//         // Forward communication to neighbors without changing state
-//         for (int label : randLabels()) {
-//             if (hasNbrAtLabel(label)) {
-//                 auto& nbr = nbrAtLabel(label);
-//                 // Check if neighbor is suitable to forward communication
-//                 if (nbr.isInState({State::Follower, State::Leader, State::Idle})) {
-//                     // Forward communication to neighbor
-//                     nbr.activate();
-//                     printf("Communication forwarded to neighbor at label: %d\n", label);
-//                     // Add any additional handling or logging here
-//                 }
-//                 // else if(nbr.isInState({State::Immo})){
-//                 //     nbr.activate();
-//                 //     break;
-
-//                 // }
-
-//             }
-
-//         }
-
-//     }
-//     if (!isInState({State::Idle})) {
-//         performMovement();
-//     }
-//     auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
-//     if (immobilizedSystem) {
-
-//         immobilizedSystem->printAllParticleStates();
-//     }
-// }
-
-// int Immobilizedparticles::nextClockwiseDir(int inputDir) {
-//     return (inputDir + 1) % 6;
-// }
-
-// int Immobilizedparticles::nextCounterclockwiseDir(int inputDir) {
-//     return (inputDir - 1 + 6) % 6;
-// }
-
-
-// void Immobilizedparticles::tryToBecomeLeader() {
-//     printf("Trying to become leader.\n");
-//      //comment
-//     for (int label : randLabels()) {
-//         moveDir = labelToDir(label);
-//         if ((isExpanded() && !hasNbrAtLabel(label) && !hasObjectAtLabel(label)) || canExpand(labelToDir(label))) {
-//             if (isExpanded()) {
-//                 makeHeadLabel(label);
-//             }
-//             state = State::Leader;
-//             leaderToken = false;
-//             tokenForwardDir = -1;
-//             tokenCurrentDir = -1;
-//             passForward = false;
-//             updateBorderPointColors(); // Only necessary for the visualisation.
-//             printf("Became leader. New move direction: %d\n", moveDir);
-//              //comment
-//             return;
-//         }
-//     }
-
-//     moveDir = -1;
-//     printf("Could not become leader, passing on leader token.\n");
-//      //comment
-
-//     int label = 0;
-//     for (int l : uniqueLabels()) {
-//         if (labelToDir(l) == tokenCurrentDir) {
-//             label = l;
-//         }
-//     }
-
-//     int numLabels = isContracted() ? 6 : 10;
-
-//     if (passForward) {
-//         while (hasObjectAtLabel(label)) {
-//             label = (label + 1) % numLabels;
-//             passForward = false;
-//         }
-//     } else {
-//         do {
-//             label = (label - 1 + numLabels) % numLabels;
-//         } while (!hasObjectAtLabel(label));
-//         while (hasObjectAtLabel(label)) {
-//             label = (label + 1) % numLabels;
-//         }
-//     }
-
-//     passLeaderToken(label);
-// }
-
-// void Immobilizedparticles::passLeaderToken(const int label) {
-//     if (isExpanded()) {
-//         makeHeadLabel(label);
-//     }
-
-//     state = State::Follower;
-//     followDir = labelToDir(label);
-//     if (tokenForwardDir < 0) {
-//         passForward = true;
-//         tokenForwardDir = followDir;
-//     }
-
-//     auto& nbr = nbrAtLabel(label);
-//     nbr.leaderToken = true;
-//     nbr.tokenForwardDir = dirToNbrDir(nbr, tokenForwardDir);
-//     nbr.tokenCurrentDir = dirToNbrDir(nbr, followDir);
-//     nbr.passForward = passForward;
-//     if (nbr.tokenForwardDir == nbr.tokenCurrentDir && tokenForwardDir != tokenCurrentDir) {
-//         if (randBool()) {
-//             nbr.passForward = true;
-//         }
-//     }
-//     nbr.updateBorderPointColors(); // Only necessary for the visualisation.
-
-//     leaderToken = false;
-//     tokenForwardDir = -1;
-//     tokenCurrentDir = -1;
-//     passForward = false;
-//     updateBorderPointColors(); // Only necessary for the visualisation.
-
-//     printf("Passed leader token to neighbor at label: %d\n", label);
-//      //comment
-// }
-
-// void Immobilizedparticles::performMovement() {
-//     if (isExpanded() && isInState({State::Follower, State::Leader}) && !hasBlockingTailNbr()) {
-//         printf("Contracting tail.\n");
-//          //comment
-//         contractTail();
-//     } else if (isContracted() && isInState({State::Follower}) && hasTailAtLabel(dirToHeadLabel(followDir))) {
-//         printf("Expanding towards follow direction: %d\n", followDir);
-//          //comment
-//         int followLabel = dirToHeadLabel(followDir);
-//         auto& nbr = nbrAtLabel(followLabel);
-//         int nbrContractionDir = nbrDirToDir(nbr, (nbr.tailDir() + 3) % 6);
-//         push(followLabel);
-//         followDir = nbrContractionDir;
-//     } else if (isInState({State::Leader}) && isContracted() && !(freeState && lineState) && canExpand(dirToHeadLabel(moveDir))) {
-//         printf("Expanding towards move direction: %d\n", moveDir);
-//          //comment
-//         expand(dirToHeadLabel(moveDir));
-//     }
-//     updateBoolStates();
-//     updateBorderColors(); // Only necessary for the visualisation.
-//     printf("Performed movement.\n");
-//      //comment
-// }
-
-
-
-
-// #include <set>
-// #include <queue> // Include this to use std::queue
-// #include "immobilizedparticles.h"
-// #include <QtGlobal>
-
-
-// // Function declaration before it's used in the constructor
-// bool doesEnclosureOccur(const std::set<Node>& occupied, Node testNode);
-// //bool isPathClear(const std::set<Node>& occupied, const Node& start, const Node& end);
-
-// Immobilizedparticles::Immobilizedparticles(const Node head,
-//                                            const int globalTailDir,
-//                                            const int orientation,
-//                                            AmoebotSystem& system,
-//                                            State state)
-//     : AmoebotParticle(head, globalTailDir, orientation, system),
-//     state(state),
-//     moveDir(-1),
-//     followDir(-1),
-//     leaderToken(false),
-//     tokenForwardDir(-1),
-//     tokenCurrentDir(-1),
-//     passForward(false),
-//     freeState(false),
-//     lineState(false),
-//     _borderColorsSet(false)
-// {
-//     _borderColors.fill(-1);
-//     _borderPointColors.fill(-1);
-// }
-
-
-// void Immobilizedparticles::activate() {
-
-//     // This the main procedure that runs when a particle is activated.
-
-//     if (leaderToken) {
-//         // p has received the leader token.
-//         // If p has an empty neighbour node, it can become the Leader.
-//         // Otherwise, it needs to pass on the token.
-//         tryToBecomeLeader();
-//         return;
-//         // The return is only here because it looks nicer when the particle does not start moving as soon as it becomes Leader.
-//     } else if (isInState({State::Idle})) {
-//         // p tries to follow any neighbour that is either the Leader or a Follower.
-//         for (int label : randLabels()) {
-//             if (hasNbrAtLabel(label)) {
-//                 auto& nbr = nbrAtLabel(label);
-//                 if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir)))
-//                     || (nbr.isInState({State::Leader})   && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
-//                     followDir = labelToDir(label);
-//                     state = State::Follower;
-//                     break;
-//                 }
-//             }
-//         }
-//     } else if (isInState({State::Leader})) {
-//         if (moveDir == -1) {
-//             moveDir = randDir();
-//         }
-//         if (isContracted() && !canExpand(dirToHeadLabel(moveDir))) {
-//             // p cannot move in its moveDir. Try to change moveDir to point towards an empty node.
-//             bool changed = false;
-//             for (int label : randLabels()) {
-//                 moveDir = labelToDir(label);
-//                 if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
-//                     if (isExpanded()) {
-//                         makeHeadLabel(label);
-//                     }
-//                     changed = true;
-//                     break;
-//                 }
-//             }
-
-//             if (!changed) {
-//                 // p's node has no empty neighbouring node.
-//                 // p needs to pass on the leader token to a suitable random neighbour.
-//                 int label = labelOfFirstNbrInState({State::Idle, State::Follower});
-//                 if (label >= 0) {
-//                     passLeaderToken(label);
-//                     moveDir = -1;
-//                 } else {
-//                     // This can only happen if the Leader is the only particle and it is
-//                     // surrounded by ImmoParticles.
-//                     // So basically never, unless you are testing weird edge cases.
-//                 }
-//             }
-//         }
-//     }
-
-//     if (!isInState({State::Idle})) {
-//         performMovement();
-//     }
-
-//     return;
-// }
-
-
-// void Immobilizedparticles::tryToBecomeLeader() {
-//     for (int label : randLabels()) {
-//         // Try to find a movement direction that is not occupied.
-//         moveDir = labelToDir(label);
-//         if ((isExpanded() && !hasNbrAtLabel(label) && !hasObjectAtLabel(label)) || canExpand(labelToDir(label))) {
-//             if (isExpanded()) {
-//                 makeHeadLabel(label);
-//             }
-//             state = State::Leader;
-//             leaderToken = false;
-//             tokenForwardDir = -1;
-//             tokenCurrentDir = -1;
-//             passForward = false;
-//             updateBorderPointColors(); // Only necessary for the visualisation.
-//             return;
-//         }
-//     }
-
-//     // Reset moveDir since the particle has not become the Leader.
-//     moveDir = -1;
-
-//     // Could not become Leader: Pass on leader token to a suitable neighbour.
-
-//     // Find the label that corresponds to the current token direction.
-//     int label = 0;
-//     for (int l : uniqueLabels()) {
-//         if (labelToDir(l) == tokenCurrentDir) {
-//             label = l;
-//         }
-//     }
-
-//     int numLabels = isContracted() ? 6 : 10;
-
-//     if (passForward) {
-//         // Try to pass the token towards the designated token direction.
-//         while (hasObjectAtLabel(label)) {
-//             // Cannot move towards the designated token direction, take the next possible
-//             // label with a node that is not occupied by an object.
-//             label = (label + 1) % numLabels;
-//             passForward = false;
-//         }
-//     } else {
-//         // Pass the token around the neighbouring object.
-//         do {
-//             // Set label to point towards the object that p is moving around.
-//             label = (label - 1 + numLabels) % numLabels;
-//         } while (!hasObjectAtLabel(label));
-//         while (hasObjectAtLabel(label)) {
-//             // Set label to the first node that is no longer occupied by an object.
-//             label = (label + 1) % numLabels;
-//         }
-//     }
-
-//     passLeaderToken(label);
-// }
-
-
-
-// void Immobilizedparticles::passLeaderToken(const int label) {
-//     if (isExpanded()) {
-//         makeHeadLabel(label);
-//     }
-
-//     // Follow the particle that will receive the particle.
-//     state = State::Follower;
-//     followDir = labelToDir(label);
-//     if (tokenForwardDir < 0) {
-//         // If p was a Leader, the designated token direction needs to be set.
-//         // Initialise to the direction that the token is passed to.
-//         passForward = true;
-//         tokenForwardDir = followDir;
-//     }
-
-//     // Pass the token with all its variables.
-//     auto& nbr = nbrAtLabel(label);
-//     nbr.leaderToken = true;
-//     nbr.tokenForwardDir = dirToNbrDir(nbr, tokenForwardDir);
-//     nbr.tokenCurrentDir = dirToNbrDir(nbr, followDir);
-//     nbr.passForward = passForward;
-//     if (nbr.tokenForwardDir == nbr.tokenCurrentDir && tokenForwardDir != tokenCurrentDir) {
-//         if (randBool()) {
-//             nbr.passForward = true;
-//         }
-//     }
-//     nbr.updateBorderPointColors(); // Only necessary for the visualisation.
-
-//     // Reset internal variables that are only required when p has the leader token.
-//     leaderToken = false;
-//     tokenForwardDir = -1;
-//     tokenCurrentDir = -1;
-//     passForward = false;
-//     updateBorderPointColors(); // Only necessary for the visualisation.
-// }
-
-// void Immobilizedparticles::performMovement() {
-//     // Fairly obvious: p tries to expand if contracted and contract if expanded.
-//     // The usual constraints apply.
-//     if (isExpanded() && isInState({State::Follower, State::Leader}) && !hasBlockingTailNbr()) {
-//         contractTail();
-//     } else if (isContracted() && isInState({State::Follower}) && hasTailAtLabel(dirToHeadLabel(followDir))) {
-//         int followLabel = dirToHeadLabel(followDir);
-//         auto& nbr = nbrAtLabel(followLabel);
-//         int nbrContractionDir = nbrDirToDir(nbr, (nbr.tailDir() + 3) % 6);
-//         push(followLabel);
-//         followDir = nbrContractionDir;
-//     } else if (isInState({State::Leader}) && isContracted() && !(freeState && lineState) && canExpand(dirToHeadLabel(moveDir))) {
-//         expand(dirToHeadLabel(moveDir));
-//     }
-//     updateBoolStates();
-//     updateBorderColors(); // Only necessary for the visualisation.
-// }
 
 bool Immobilizedparticles::hasBlockingTailNbr() const {
     for (int label : uniqueLabels()) {
@@ -1656,7 +814,9 @@ int Immobilizedparticles::headMarkColor() const {
     case State::Leader:       return 0xff8800; // orange
     case State::Follower:     return 0x0000ff; // blue
     case State::Immo:  return 0xFF0000; //red
-    case State::Cluster:  return  0xFFCC99; //unknown
+    case State::Cluster:      return 0xFF1493; // Fluorescent Pink
+    case State::ClusterLead:  return 0x39FF14; // Fluorescent Green
+    case State::ClusterMark:  return 0x00FFEF; // Fluorescent Blue
     default:                  return -1;
     }
     return -1;
