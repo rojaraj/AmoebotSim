@@ -10,12 +10,16 @@
 #include "core/node.h"
 
 class ImmoParticle {
+
  public:
+
+
   // Constructs an immobilized particle entity positioned at the given Node
-  ImmoParticle(const Node& _node = Node());
+    ImmoParticle(const Node& _node = Node());
 
   Node _node;
-  //int globalTailDir;
+   bool immobilized;
+
 };
 
 #endif  // AMOEBOTSIM_CORE_IMMOPARTICLE_H_

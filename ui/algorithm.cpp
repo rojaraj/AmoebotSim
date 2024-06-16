@@ -344,19 +344,20 @@ void InfObjCoatingAlg::instantiate(const int numParticles,
 }
 
 LeaderElectionAlg::LeaderElectionAlg() :
-  Algorithm("Leader Election", "leaderelection") {
+  Algorithm("Immobilized with Leader Election", "leaderelection") {
   addParameter("# Particles", "100");
+    addParameter("# Immobilized Particles","10");
   addParameter("Hole Prob.", "0.2");
 }
 
-void LeaderElectionAlg::instantiate(const int numParticles,
+void LeaderElectionAlg::instantiate(const int numParticles, const int numImmoParticles,
                                     const double holeProb) {
-  if (numParticles <= 0) {
+    if (numParticles <= 0 && numImmoParticles<0) {
     emit log("# particles must be > 0", true);
   } else if (holeProb < 0 || holeProb > 1) {
     emit log("holeProb in [0,1] required", true);
   } else {
-    emit setSystem(std::make_shared<LeaderElectionSystem>(numParticles,
+    emit setSystem(std::make_shared<LeaderElectionSystem>(numParticles, numImmoParticles,
                                                           holeProb));
   }
 }

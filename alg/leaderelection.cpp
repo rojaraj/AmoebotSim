@@ -94,6 +94,9 @@ int LeaderElectionParticle::headMarkColor() const {
   if (state == State::Leader) {
     return 0x00ff00;
   }
+  else if(state == State::Immo){
+      return 0xFF0000;
+  }
 
   return -1;
 }
@@ -963,6 +966,9 @@ void LeaderElectionParticle::LeaderElectionAgent::setStateColor() {
     case State::Demoted:
       candidateParticle->borderPointColorLabels.at(globalizedDir) = 0x696969;
       break;
+    case State::Immo:
+        candidateParticle->borderColorLabels.at(globalizedDir) = 0xFF0000;
+        break;
     case State::SoleCandidate:
       candidateParticle->borderPointColorLabels.at(globalizedDir) = 0x00ff00;
       break;
@@ -1024,55 +1030,124 @@ void LeaderElectionParticle::LeaderElectionAgent::paintBackSegment(
 
 //----------------------------BEGIN SYSTEM CODE----------------------------
 
-LeaderElectionSystem::LeaderElectionSystem(int numParticles, double holeProb) {
-  Q_ASSERT(numParticles > 0);
-  Q_ASSERT(0 <= holeProb && holeProb <= 1);
+LeaderElectionSystem::LeaderElectionSystem(int numParticles, int numImmoParticles, double holeProb) {
+    Q_ASSERT(numParticles > 0);
+    Q_ASSERT(numImmoParticles >= 0);
+    Q_ASSERT(0 <= holeProb && holeProb <= 1);
 
-  // Insert the seed at (0,0).
-  insert(new LeaderElectionParticle(Node(0, 0), -1, randDir(), *this,
-                                    LeaderElectionParticle::State::Idle));
-  std::set<Node> occupied;
-  occupied.insert(Node(0, 0));
+    // Insert the seed at (0,0).
+    insert(new LeaderElectionParticle(Node(0, 0), -1, randDir(), *this,
+                                      LeaderElectionParticle::State::Idle));
+    std::set<Node> occupied;
+    occupied.insert(Node(0, 0));
 
-  std::set<Node> candidates;
-  for (int i = 0; i < 6; ++i) {
-    candidates.insert(Node(0, 0).nodeInDir(i));
-  }
-
-  // Add inactive particles.
-  int numNonStaticParticles = 0;
-  while (numNonStaticParticles < numParticles && !candidates.empty()) {
-    // Pick random candidate.
-    int randIndex = randInt(0, candidates.size());
-    Node randomCandidate;
-    for (auto it = candidates.begin(); it != candidates.end(); ++it) {
-      if (randIndex == 0) {
-        randomCandidate = *it;
-        candidates.erase(it);
-        break;
-      } else {
-        randIndex--;
-      }
+    std::set<Node> candidates;
+    for (int i = 0; i < 6; ++i) {
+        candidates.insert(Node(0, 0).nodeInDir(i));
     }
 
-    occupied.insert(randomCandidate);
-
-    // Add this candidate as a particle if not a hole.
-    if (randBool(1.0 - holeProb)) {
-      insert(new LeaderElectionParticle(randomCandidate, -1, randDir(), *this,
-                                        LeaderElectionParticle::State::Idle));
-      ++numNonStaticParticles;
-
-      // Add new candidates.
-      for (int i = 0; i < 6; ++i) {
-        auto neighbor = randomCandidate.nodeInDir(i);
-        if (occupied.find(neighbor) == occupied.end()) {
-          candidates.insert(neighbor);
+    // Add inactive particles.
+    while ((numParticles > 0 || numImmoParticles > 0) && !candidates.empty()) {
+        // Pick random candidate.
+        int randIndex = randInt(0, candidates.size());
+        Node randomCandidate;
+        for (auto it = candidates.begin(); it != candidates.end(); ++it) {
+            if (randIndex == 0) {
+                randomCandidate = *it;
+                candidates.erase(it);
+                break;
+            } else {
+                randIndex--;
+            }
         }
-      }
+
+        occupied.insert(randomCandidate);
+
+        // Decide whether to add a non-immobilized or immobilized particle.
+        if (randBool((double) numParticles / ((double) numParticles + (double) numImmoParticles))) {
+            // Add this candidate as a non-immobilized particle if not a hole.
+            if (randBool(1.0 - holeProb)) {
+                insert(new LeaderElectionParticle(randomCandidate, -1, randDir(), *this,
+                                                  LeaderElectionParticle::State::Idle));
+                numParticles--;
+            }
+        } else {
+            // Avoid adding an immobilized particle if it is enclosed by non-immobilized particles.
+            bool isEnclosed = true;
+            for (int i = 0; i < 6; ++i) {
+                Node neighbor = randomCandidate.nodeInDir(i);
+                if (occupied.find(neighbor) == occupied.end()) {
+                    isEnclosed = false;
+                    break;
+                }
+            }
+
+            if (!isEnclosed) {  // Only insert if not enclosed by non-immobilized particles.
+                numImmoParticles--;
+                insert(new LeaderElectionParticle(randomCandidate, -1, randDir(), *this,
+                                                  LeaderElectionParticle::State::Immo));
+            }
+        }
+
+        // Add new candidates.
+        for (int i = 0; i < 6; ++i) {
+            auto neighbor = randomCandidate.nodeInDir(i);
+            if (occupied.find(neighbor) == occupied.end()) {
+                candidates.insert(neighbor);
+            }
+        }
     }
-  }
 }
+
+// LeaderElectionSystem::LeaderElectionSystem(int numParticles,int numImmoParticles, double holeProb) {
+//   Q_ASSERT(numParticles > 0);
+//   Q_ASSERT(0 <= holeProb && holeProb <= 1);
+
+//   // Insert the seed at (0,0).
+//   insert(new LeaderElectionParticle(Node(0, 0), -1, randDir(), *this,
+//                                     LeaderElectionParticle::State::Idle));
+//   std::set<Node> occupied;
+//   occupied.insert(Node(0, 0));
+
+//   std::set<Node> candidates;
+//   for (int i = 0; i < 6; ++i) {
+//     candidates.insert(Node(0, 0).nodeInDir(i));
+//   }
+
+//   // Add inactive particles.
+//   int numNonStaticParticles = 0;
+//   while (numNonStaticParticles < numParticles && !candidates.empty()) {
+//     // Pick random candidate.
+//     int randIndex = randInt(0, candidates.size());
+//     Node randomCandidate;
+//     for (auto it = candidates.begin(); it != candidates.end(); ++it) {
+//       if (randIndex == 0) {
+//         randomCandidate = *it;
+//         candidates.erase(it);
+//         break;
+//       } else {
+//         randIndex--;
+//       }
+//     }
+
+//     occupied.insert(randomCandidate);
+
+//     // Add this candidate as a particle if not a hole.
+//     if (randBool(1.0 - holeProb)) {
+//       insert(new LeaderElectionParticle(randomCandidate, -1, randDir(), *this,
+//                                         LeaderElectionParticle::State::Idle));
+//       ++numNonStaticParticles;
+
+//       // Add new candidates.
+//       for (int i = 0; i < 6; ++i) {
+//         auto neighbor = randomCandidate.nodeInDir(i);
+//         if (occupied.find(neighbor) == occupied.end()) {
+//           candidates.insert(neighbor);
+//         }
+//       }
+//     }
+//   }
+// }
 
 bool LeaderElectionSystem::hasTerminated() const {
   #ifdef QT_DEBUG

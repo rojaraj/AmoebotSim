@@ -31,6 +31,7 @@ class Node {
   Node nodeInDir(int dir) const;
 
     int x, y;
+
 };
 
 // Comparator between two nodes. First compares the nodes' x-coordinates and, in

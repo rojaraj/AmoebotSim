@@ -208,7 +208,7 @@ class LeaderElectionAlg : public Algorithm {
   LeaderElectionAlg();
 
  public slots:
-  void instantiate(const int numParticles = 100, const double holeProb = 0.2);
+  void instantiate(const int numParticles = 30, const int numImmoParticles =10, const double holeProb = 0.2);
 };
 
 

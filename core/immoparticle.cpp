@@ -5,4 +5,5 @@
 #include "core/immoparticle.h"
 
 ImmoParticle::ImmoParticle(const Node& node) :
-  _node(node) {}
+    immobilized(true),
+    _node(node) {}
