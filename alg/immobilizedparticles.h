@@ -44,6 +44,7 @@ public:
     //virtual std::vector<int> getNbrLabels() const;
 
     virtual void tryToBecomeLeader();
+    virtual void activateHex();
     int nextClockwiseDir(int inputDir);
     int nextCounterclockwiseDir(int inputDir);
 

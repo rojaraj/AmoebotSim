@@ -235,6 +235,7 @@ class LeaderElectionParticle : public AmoebotParticle {
     SubPhase subPhase;
     LeaderElectionParticle* candidateParticle;
 
+     bool immobilized = false;
     // Variables for Segment Comparison:
     // comparingSegment is true if this agent is in the Segment Comparison
     // subphase and has generated and passed a segment lead token along its

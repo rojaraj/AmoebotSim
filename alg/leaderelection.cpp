@@ -23,7 +23,9 @@ LeaderElectionParticle::LeaderElectionParticle(const Node head,
 }
 
 void LeaderElectionParticle::activate() {
-  if (state == State::Idle) {
+
+
+    if (state == State::Idle || state == State::Immo) {
     // Determine the number of neighbors of the current particle.
     // If there are no neighbors, then that means the particle is the only
     // one in the system and should declare itself as the leader.
@@ -33,10 +35,16 @@ void LeaderElectionParticle::activate() {
     // generate agents to do so.
     int numNbrs = getNumberOfNbrs();
     if (numNbrs == 0) {
-      state = State::Leader;
-      return;
+
+            state = State::Leader;
+            return;
+
+
     } else if (numNbrs == 6) {
-      state = State::Finished;
+
+             state = State::Finished;
+
+
     } else {
       int agentId = 0;
       for (int dir = 0; dir < 6; dir++) {
@@ -49,7 +57,14 @@ void LeaderElectionParticle::activate() {
           agent->agentDir = dir;
           agent->nextAgentDir = getNextAgentDir(dir);
           agent->prevAgentDir = getPrevAgentDir(dir);
-          agent->agentState = State::Candidate;
+          if(state == State::Immo){
+              agent->agentState = State::Candidate;
+              agent->immobilized = true;
+          }
+          else{
+              agent->agentState = State::Candidate;
+          }
+
           agent->subPhase = LeaderElectionAgent::SubPhase::SegmentComparison;
           agent->setStateColor();
 
@@ -60,8 +75,13 @@ void LeaderElectionParticle::activate() {
           agentId++;
         }
       }
+      if(state == State::Immo){
+          printf("Immo: Do Nothing 1:");
+      }
+      else{
       state = State::Candidate;
       return;
+      }
     }
   } else if (state == State::Candidate) {
     agents.at(currentAgent)->activate();
@@ -73,7 +93,7 @@ void LeaderElectionParticle::activate() {
     bool allFinished = true;
     for (unsigned i = 0; i < agents.size(); i++) {
       LeaderElectionAgent* agent = agents.at(i);
-      if (agent->agentState != State::Finished) {
+      if (agent->agentState != State::Finished ||agent->agentState != State::Immo ) {
         allFinished = false;
       }
       if (agent->agentState == State::Leader) {
@@ -84,8 +104,18 @@ void LeaderElectionParticle::activate() {
 
     if (allFinished) {
       state = State::Finished;
+
     }
   }
+  else if (state == State::Immo) {
+      if (!agents.empty()) {
+      agents.at(currentAgent)->activate();
+      currentAgent = (currentAgent + 1) % agents.size();
+      return;
+      }
+
+  }
+
 
   return;
 }
@@ -232,6 +262,12 @@ LeaderElectionParticle::LeaderElectionAgent::LeaderElectionAgent() :
 
 void LeaderElectionParticle::LeaderElectionAgent::activate() {
   passTokensDir = randInt(0, 2);
+
+    if (agentState == State::Immo) {
+        // Here, we may want to just return as Immo state agents do not participate
+        printf( "Agent is in Immo state, not performing any action." );
+        return;
+    }
   if (agentState == State::Candidate) {
     // Segment Comparison
     if (hasAgentToken<ActiveSegmentCleanToken>(nextAgentDir)) {
@@ -422,10 +458,12 @@ void LeaderElectionParticle::LeaderElectionAgent::activate() {
         return;
       }
     }
-  } else if (agentState == State::Demoted) {
+  } else if (agentState == State::Demoted ) {
     LeaderElectionAgent* next = nextAgent();
     LeaderElectionAgent* prev = prevAgent();
-
+    // if(agentState == State::Immo) {
+    //     return;
+    // }
     // Segment Comparison Tokens
     if (hasAgentToken<PassiveSegmentCleanToken>(prevAgentDir)) {
       passiveClean(false);
@@ -637,8 +675,10 @@ void LeaderElectionParticle::LeaderElectionAgent::activate() {
       agentState = State::Finished;
       setStateColor();
     }
+  }
 
-  } else if (agentState == State::SoleCandidate) {
+
+ else if (agentState == State::SoleCandidate) {
     if (!testingBorder) {
       std::shared_ptr<BorderTestToken> token =
           std::make_shared<BorderTestToken>(prevAgentDir, addNextBorder(0));
@@ -1029,7 +1069,6 @@ void LeaderElectionParticle::LeaderElectionAgent::paintBackSegment(
 //----------------------------END AGENT CODE----------------------------
 
 //----------------------------BEGIN SYSTEM CODE----------------------------
-
 LeaderElectionSystem::LeaderElectionSystem(int numParticles, int numImmoParticles, double holeProb) {
     Q_ASSERT(numParticles > 0);
     Q_ASSERT(numImmoParticles >= 0);
@@ -1040,37 +1079,56 @@ LeaderElectionSystem::LeaderElectionSystem(int numParticles, int numImmoParticle
                                       LeaderElectionParticle::State::Idle));
     std::set<Node> occupied;
     occupied.insert(Node(0, 0));
-
+    numParticles--;
     std::set<Node> candidates;
     for (int i = 0; i < 6; ++i) {
         candidates.insert(Node(0, 0).nodeInDir(i));
+
     }
 
     // Add inactive particles.
-    while ((numParticles > 0 || numImmoParticles > 0) && !candidates.empty()) {
-        // Pick random candidate.
-        int randIndex = randInt(0, candidates.size());
+    while ((numParticles > 0 || numImmoParticles > 0)) {
+        // Pick a random candidate that has at least one neighbor occupied.
         Node randomCandidate;
-        for (auto it = candidates.begin(); it != candidates.end(); ++it) {
-            if (randIndex == 0) {
-                randomCandidate = *it;
+        bool foundCandidate = false;
+        while (!foundCandidate && !candidates.empty()) {
+            int randIndex = randInt(0, candidates.size());
+            auto it = candidates.begin();
+            std::advance(it, randIndex);
+            randomCandidate = *it;
+
+            // Check if the candidate has at least one occupied neighbor.
+            bool hasOccupiedNeighbor = false;
+            for (int i = 0; i < 6; ++i) {
+                if (occupied.find(randomCandidate.nodeInDir(i)) != occupied.end()) {
+                    hasOccupiedNeighbor = true;
+                    break;
+                }
+            }
+
+            if (hasOccupiedNeighbor) {
                 candidates.erase(it);
-                break;
+                foundCandidate = true;
             } else {
-                randIndex--;
+                candidates.erase(it);
             }
         }
 
+        if (!foundCandidate) {
+            break; // No valid candidate found, break out of the loop.
+        }
+
         occupied.insert(randomCandidate);
+        //candidates.erase(it);
 
         // Decide whether to add a non-immobilized or immobilized particle.
         if (randBool((double) numParticles / ((double) numParticles + (double) numImmoParticles))) {
             // Add this candidate as a non-immobilized particle if not a hole.
-            if (randBool(1.0 - holeProb)) {
+            //if (randBool(1.0 - holeProb)) {
                 insert(new LeaderElectionParticle(randomCandidate, -1, randDir(), *this,
                                                   LeaderElectionParticle::State::Idle));
                 numParticles--;
-            }
+            //}
         } else {
             // Avoid adding an immobilized particle if it is enclosed by non-immobilized particles.
             bool isEnclosed = true;

@@ -185,9 +185,17 @@ void Immobilizedparticles::activate() {
     } catch (...) {
         printf("Unknown exception occurred.\n");
     }
+    updateBoolStates();
+    updateBorderColors();
+    if(system.hasTerminated()){
+        activateHex();
+    }
 }
 
 
+void Immobilizedparticles::activateHex(){
+
+}
 
 int Immobilizedparticles::nextClockwiseDir(int inputDir) {
     return (inputDir + 1) % 6;
@@ -437,7 +445,7 @@ void Immobilizedparticles::updateBoolStates() {
 
     // A particle is 'free' if it is not adjacent to any ImmoParticles and all its children are 'free'.
     // freeState and lineState are only relevant once all Idle particles have changed their state.
-    if (hasObjectNbr() || hasNbrInState({State::Idle}) || hasNbrInState({State::Cluster}) || hasNbrInState({State::Immo})) {
+    if (hasObjectNbr() || hasNbrInState({State::Idle}) || hasNbrInState({State::Cluster})) {
         freeState = false;
         lineState = false;
         printf("Free state is false.\n");
@@ -813,9 +821,10 @@ int Immobilizedparticles::headMarkColor() const {
     switch (state) {
     case State::Leader:       return 0xff8800; // orange
     case State::Follower:     return 0x0000ff; // blue
-    case State::Immo:  return 0xFF0000; //red
-    case State::Cluster:      return 0xFF1493; // Fluorescent Pink
-    case State::ClusterLead:  return 0x39FF14; // Fluorescent Green
+    case State::Immo:         return 0xFF0000; //red
+    case State::Cluster:      return 0x39FF14; // Fluorescent Green
+    // case State::Single:       return 0x00FFEF; // Fluorescent Blue
+    case State::ClusterLead:  return 0xFF1493; // Fluorescent PinkGreen
     case State::ClusterMark:  return 0x00FFEF; // Fluorescent Blue
     default:                  return -1;
     }
