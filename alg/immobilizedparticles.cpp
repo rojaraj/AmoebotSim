@@ -24,6 +24,8 @@ Immobilizedparticles::Immobilizedparticles(const Node head,
     passForward(false),
     freeState(false),
     lineState(false),
+    _parentDir(-1),
+    _hexagonDir(state == State::Seed ? 0 : -1),
     _borderColorsSet(false)
 {
     _borderColors.fill(-1);
@@ -55,7 +57,14 @@ void Immobilizedparticles::activate() {
                         state = State::Follower;
                         printf("Following neighbor at label: %d\n", label);
                         return;
-                    } else if (nbr.isInState({State::Leader}) || nbr.isInState({State::Follower})) {
+                    }else if (nbr.isInState({State::Leader})) {
+                        // Handle the case where the neighbor is a leader
+                        followDir = labelToDir(label); // Set the follow direction to the direction of the leader
+                        state = State::Follower; // Change the particle's state to follower
+                        nbr.moveDir = followDir; // Set the direction of the leader to the direction of the follower
+                        return;}
+
+                    else if (nbr.isInState({State::Leader}) || nbr.isInState({State::Follower})) {
                         hasLeaderOrFollowerNeighbor = true;
                     }
                 }
@@ -112,28 +121,6 @@ void Immobilizedparticles::activate() {
                 }
             }
         }
-
-
-
-        /*else if(isInState({State::Follower})){
-            for (int label : {0, 1, 2, 3, 4, 5}) {
-
-                if (hasNbrAtLabel(label)) {
-                    auto& nbr = nbrAtLabel(label);
-                    // If the neighbor is not already a follower, make it a follower
-                    if (nbr.isInState({State::Idle,State::Cluster})) {
-                        printf(" Before Setting neighbor at label %d to follower.\n", label);
-
-                        nbr.state = State::Follower;
-                        nbr.followDir = labelToDir(label);
-                        printf("Setting neighbor at label %d to follower.\n", label);
-                    }
-                }
-                else{
-                    break;
-                }
-            }
-        }*/
             else if (isInState({State::Immo})) {
             printf("Particle is immobile. Forwarding communication without changing state.\n");
             for (int label : randLabels()) {
@@ -173,13 +160,13 @@ void Immobilizedparticles::activate() {
         }
 
 
-        if (!isInState({State::Idle, State::Immo, State::Cluster})) {
+        if (!isInState({State::Idle, State::Immo, State::Cluster, State::Root, State::Retired, State::Seed, State::FollowerHex})) {
             performMovement();
         }
-        auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
-        if (immobilizedSystem) {
-            immobilizedSystem->printAllParticleStates();
-        }
+        // auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
+        // if (immobilizedSystem) {
+        //     immobilizedSystem->printAllParticleStates();
+        // }
     } catch (const std::exception& e) {
         printf("Exception occurred: %s\n", e.what());
     } catch (...) {
@@ -187,13 +174,77 @@ void Immobilizedparticles::activate() {
     }
     updateBoolStates();
     updateBorderColors();
-    if(system.hasTerminated()){
-        activateHex();
-    }
+
 }
 
 
-void Immobilizedparticles::activateHex(){
+void Immobilizedparticles::activateHex() {
+    // alpha_1: idle or follower particles with a seed or retired neighbor become
+    // roots and begin traversing the hexagon's surface.
+    if(isInState({State::Leader})){
+        state=State::Seed;
+}
+    if(isInState({State::Follower})){
+        state=State::FollowerHex;
+    }
+    printf("Fail 1");
+    if (isContracted()
+        && (isInState({State::FollowerHex}))
+        && hasNbrInState({State::Seed, State::Retired})) {
+        _parentDir = -1;
+        state = State::Root;
+        _hexagonDir = nextHexagonDir(1);  // clockwise.
+        printf("Fail 2");
+    }
+
+    // alpha_3: contracted roots with no idle neighbors who are pointed at by a
+    // retired or seed particle's construction direction retire.
+
+    else if (isContracted()
+             && state == State::Root
+             && !hasNbrInState({State::Idle})
+             && canRetire()) {
+        _hexagonDir = nextHexagonDir(-1);  // counter-clockwise.
+        state = State::Retired;
+         printf("Fail 4");
+    }
+    // alpha_4: contracted roots that can expand along the surface of the hexagon
+    // do so.
+
+    else if (isContracted()
+             && state == State::Root
+             && !hasNbrAtLabel(_hexagonDir)) {
+        expand(_hexagonDir);
+    }
+    // alpha_5: expanded followers and roots without idle neighbors but with a
+    // tail child pull a tail child in a handover.
+    else if (isExpanded()
+             && ( state == State::FollowerHex || state == State::Root)
+             && !hasNbrInState({State::Idle})
+             && !conTailChildLabels().empty()) {
+        if (state == State::Root)
+            _hexagonDir = nextHexagonDir(1);  // clockwise.
+        int childLabel = conTailChildLabels()[0];
+        nbrAtLabel(childLabel)._parentDir = dirToNbrDir(nbrAtLabel(childLabel),
+                                                        (tailDir() + 3) % 6);
+        pull(childLabel);
+         printf("Fail 5");
+    }
+
+    // alpha_6: expanded followers and roots without idle neighbors or tail
+    // children contract their tails.
+    else if (isExpanded()
+             && (state == State::FollowerHex || state == State::Root)
+             && !hasNbrInState({State::Idle})
+             && !hasTailChild()) {
+        if (state == State::Root)
+            _hexagonDir = nextHexagonDir(1);  // clockwise.
+        contractTail();
+        printf("Fail 6");
+    }
+
+
+
 
 }
 
@@ -287,6 +338,12 @@ void Immobilizedparticles::passLeaderToken(const int label) {
 }
 
 void Immobilizedparticles::performMovement() {
+    if (!areAllClusterAndIdleParticlesFollowers()) {
+        printf("Waiting for all Cluster and Idle particles to become Followers.\n");
+
+    }
+    else
+    {
     if (isExpanded() && isInState({State::Follower, State::Leader}) && !hasBlockingTailNbr()) {
         printf("Contracting tail.\n");
         contractTail();
@@ -306,6 +363,7 @@ void Immobilizedparticles::performMovement() {
     updateBoolStates();
     updateBorderColors();
     printf("Performed movement.\n");
+    }
 }
 
 bool Immobilizedparticles::areAllClusterAndIdleParticlesFollowers() {
@@ -387,6 +445,12 @@ void Immobilizedparticles::performMovement2() {
                         break;
                     } else if (nbr.isInState({State::Cluster})) {
                         connected = false;
+                        // if (isExpanded()) {
+                        //     contractHead();
+                        // }
+                        // state = originalState;
+                        // head = originalHead;
+                        // nbr.performMovement2();
                     } else {
                         connected = true;
                         followDir = labelOfFirstNbrInState({State::Leader, State::Follower});
@@ -574,65 +638,6 @@ bool Immobilizedparticles::isInState(std::initializer_list<State> states) const 
     return false;
 }
 
-// ImmobilizedParticleSystem::ImmobilizedParticleSystem(int numParticles, int numImmoParticles, int genExpExample, int numCoinFlips) {
-//     Q_ASSERT(numParticles > 0);
-//     Q_ASSERT(numImmoParticles >= 0);
-//     Q_ASSERT(genExpExample == 0 || genExpExample == 1);
-//     Q_ASSERT(numCoinFlips > 0);
-
-//     std::set<Node> occupied;
-//     std::set<Node> candidates;
-
-//     _seedOrientation = randDir();
-//     Immobilizedparticles* leader = nullptr;
-
-//     for (int i = 0; i < 6; ++i) {
-//         candidates.insert(Node(0, 0).nodeInDir(i));
-//     }
-
-//     while (numParticles > 0 || numImmoParticles > 0) {
-//         int randIndex = randInt(0, candidates.size());
-//         auto it = candidates.begin();
-//         std::advance(it, randIndex);
-//         Node randomCandidate = *it;
-
-//         if (randBool((double) numParticles / ((double) numParticles + (double) numImmoParticles))) {
-//             numParticles--;
-//             Immobilizedparticles* newParticle = new Immobilizedparticles(randomCandidate, -1, randDir(), *this, Immobilizedparticles::State::Idle);
-//             insert(newParticle);
-//             leader = newParticle;  // Update leader to the last added non-immobilized particle
-//         } else {
-//             // Avoid adding an immobilized particle if it is enclosed by non-immobilized particles
-//             bool isEnclosed = true;
-//             for (int i = 0; i < 6; ++i) {
-//                 Node neighbor = randomCandidate.nodeInDir(i);
-//                 if (occupied.find(neighbor) == occupied.end()) {
-//                     isEnclosed = false;
-//                     break;
-//                 }
-//             }
-
-//             if (!isEnclosed) {  // Only insert if not enclosed by non-immobilized particles
-//                 numImmoParticles--;
-//                 insert(new ImmoParticle(randomCandidate));
-//             }
-//         }
-
-//         occupied.insert(randomCandidate);
-//         candidates.erase(it);
-
-//         for (int i = 0; i < 6; ++i) {
-//             Node neighbor = randomCandidate.nodeInDir(i);
-//             if (occupied.find(neighbor) == occupied.end()) {
-//                 candidates.insert(neighbor);
-//             }
-//         }
-//     }
-
-//     if (leader != nullptr) {
-//         leader->setState(Immobilizedparticles::State::Leader);
-//     }
-// }
 
 void Immobilizedparticles::setState(Immobilizedparticles::State newState) {
     state = newState;
@@ -704,76 +709,6 @@ ImmobilizedParticleSystem::ImmobilizedParticleSystem(int numParticles, int numIm
     }
 }
 
-// void ImmobilizedParticleSystem::printAllParticleStates() const{
-//     for (const auto& particle : particles) {
-//         auto immobileParticle = dynamic_cast<const Immobilizedparticles*>(particle);
-//         if (immobileParticle) {
-//             printf("%s\n", immobileParticle->inspectionText().toStdString().c_str());
-//         }
-//     }
-// }
-
-
-
-
-
-
-// ImmobilizedParticleSystem::ImmobilizedParticleSystem(int numParticles, int numImmoParticles, int genExpExample, int numCoinFlips) {
-//     Q_ASSERT(numParticles > 0);
-//     Q_ASSERT(numImmoParticles >= 0);
-//     Q_ASSERT(genExpExample == 0 || genExpExample == 1);
-//     Q_ASSERT(numCoinFlips > 0);
-
-//     std::set<Node> occupied;
-//     std::set<Node> candidates;
-
-//     _seedOrientation = randDir();
-//     Immobilizedparticles* leader = new Immobilizedparticles(Node(0, 0), -1, seedOrientation(), *this, Immobilizedparticles::State::Leader);
-//     insert(leader);
-//     occupied.insert(Node(0, 0));
-//     numParticles--;
-
-//     for (int i = 0; i < 6; ++i) {
-//         candidates.insert(Node(0, 0).nodeInDir(i));
-//     }
-
-//     while (numParticles > 0 || numImmoParticles > 0) {
-//         int randIndex = randInt(0, candidates.size());
-//         auto it = candidates.begin();
-//         std::advance(it, randIndex);
-//         Node randomCandidate = *it;
-
-//         if (randBool((double) numParticles / ((double) numParticles + (double) numImmoParticles))) {
-//             numParticles--;
-//             insert(new Immobilizedparticles(randomCandidate, -1, randDir(), *this, Immobilizedparticles::State::Idle));
-//         } else {
-//             // Avoid adding an immobilized particle if it is enclosed by non-immobilized particles
-//             bool isEnclosed = true;
-//             for (int i = 0; i < 6; ++i) {
-//                 Node neighbor = randomCandidate.nodeInDir(i);
-//                 if (occupied.find(neighbor) == occupied.end()) {
-//                     isEnclosed = false;
-//                     break;
-//                 }
-//             }
-
-//             if (!isEnclosed) {  // Only insert if not enclosed by non-immobilized particles
-//                 numImmoParticles--;
-//                 insert(new ImmoParticle(randomCandidate));
-//                 }
-//         }
-
-//         occupied.insert(randomCandidate);
-//         candidates.erase(it);
-
-//         for (int i = 0; i < 6; ++i) {
-//             Node neighbor = randomCandidate.nodeInDir(i);
-//             if (occupied.find(neighbor) == occupied.end()) {
-//                 candidates.insert(neighbor);
-//             }
-//         }
-//     }
-// }
 
 bool ImmobilizedParticleSystem::hasTerminated() const {
 #ifdef QT_DEBUG
@@ -785,16 +720,23 @@ bool ImmobilizedParticleSystem::hasTerminated() const {
     bool leaderExists = false;
     for (auto p : particles) {
         auto hp = dynamic_cast<Immobilizedparticles*>(p);
-        if (hp->isInState({Immobilizedparticles::State::Idle}) || !hp->freeState || !hp->lineState || hp->isExpanded()) {
+        if (hp->isInState({Immobilizedparticles::State::Idle}) || hp->isInState({Immobilizedparticles::State::Cluster}) || !hp->freeState || !hp->lineState || hp->isExpanded()) {
             return false;
         }
-        if (hp->isInState({Immobilizedparticles::State::Leader})) {
-            leaderExists = true;
-        }
+        if(hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})){
+
+                if (hp->isInState({Immobilizedparticles::State::Leader})) {
+                    leaderExists = true;
+
+                }
+               // hp->activateHex();
+            }
+
     }
 
     return leaderExists;
 }
+
 
 
 //Particle Apperance
@@ -825,7 +767,11 @@ int Immobilizedparticles::headMarkColor() const {
     case State::Cluster:      return 0x39FF14; // Fluorescent Green
     // case State::Single:       return 0x00FFEF; // Fluorescent Blue
     case State::ClusterLead:  return 0xFF1493; // Fluorescent PinkGreen
-    case State::ClusterMark:  return 0x00FFEF; // Fluorescent Blue
+    case State::ClusterMark:  return 0x00FFEF;
+    case State::Seed:      return 0xFF1493;
+    case State::Root:      return 0xff0000;  // red
+    case State::Retired:   return 0x000000;  // black
+            // Fluorescent Blue
     default:                  return -1;
     }
     return -1;
@@ -891,4 +837,65 @@ void Immobilizedparticles::updateBorderPointColors() {
     } else {
         _borderPointColors.fill(-1);
     }
+}
+
+
+
+
+
+
+int Immobilizedparticles::nextHexagonDir(int orientation) const {
+    // First, find a head label that points to a seed or retired neighbor.
+    int hexagonLabel;
+    for (int label : headLabels()) {
+        if (hasNbrAtLabel(label)
+            && (nbrAtLabel(label).state == State::Seed
+                || nbrAtLabel(label).state == State::Retired)) {
+            hexagonLabel = label;
+            break;
+        }
+    }
+
+    // Next, find the label that points along the hexagon's surface in a traversal
+    // with the specified orientation. Perhaps counterintuitively, this means that
+    // we search from the above label in the opposite orientation for the first
+    // unoccupied or non-seed/retired neighbor.
+    int numLabels = isContracted() ? 6 : 10;
+    while (hasNbrAtLabel(hexagonLabel)
+           && (nbrAtLabel(hexagonLabel).state == State::Seed
+               || nbrAtLabel(hexagonLabel).state == State::Retired))
+        hexagonLabel = (hexagonLabel + orientation + numLabels) % numLabels;
+
+    // Convert this label to a direction before returning.
+    return labelToDir(hexagonLabel);
+}
+
+bool Immobilizedparticles::canRetire() const {
+    auto prop = [&](const Immobilizedparticles& p) {
+        return (p.state == State::Seed || p.state == State::Retired)
+               && pointsAtMe(p, p._hexagonDir);
+    };
+
+    return labelOfFirstNbrWithProperty<Immobilizedparticles>(prop) != -1;
+}
+
+bool Immobilizedparticles::hasTailChild() const {
+    auto prop = [&](const Immobilizedparticles& p) {
+        return p._parentDir != -1
+               && pointsAtMyTail(p, p.dirToHeadLabel(p._parentDir));
+    };
+
+    return labelOfFirstNbrWithProperty<Immobilizedparticles>(prop) != -1;
+}
+
+const std::vector<int> Immobilizedparticles::conTailChildLabels() const {
+    std::vector<int> labels;
+    for (int label : tailLabels())
+        if (hasNbrAtLabel(label)
+            && nbrAtLabel(label).isContracted()
+            && nbrAtLabel(label)._parentDir != -1
+            && pointsAtMyTail(nbrAtLabel(label), nbrAtLabel(label)._parentDir))
+            labels.push_back(label);
+
+    return labels;
 }

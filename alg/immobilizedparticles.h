@@ -20,10 +20,14 @@ public:
         Immo,       // for immo particle
         Leader,
         Idle,       // initial state
-        Follower,   // Member of the spanning forest but not on the forming hexagon.
+        Follower,
+        FollowerHex,        // Member of the spanning forest but not on the forming hexagon.
         ClusterLead,       // On the surface of the forming hexagon.
         ClusterMark,    // In the forming hexagon.
-        Cluster    // non-immobilized particle which is not a part of the spanning forest
+        Cluster,
+        Seed,
+        Retired,
+        Root        // non-immobilized particle which is not a part of the spanning forest
 
 
     };
@@ -91,15 +95,19 @@ public:
     // label. Crashes if no such particle exists at this label; consider using
     // hasNbrAtLabel() first if unsure.
     Immobilizedparticles& nbrAtLabel(int label) const;
+    //virtual int labelOfFirstNbrInState(std::initializer_list<State> states, int startLabel, bool ignoreErrorParticles) const;
 
     // Returns the label of the first port incident to a neighboring particle in
     // any of the specified states, starting at the (optionally) specified label
     // and continuing clockwise.
-    int labelOfFirstNbrInState(std::initializer_list<State> states,
-                               int startLabel = 0, bool ignoreImmobParticles = true) const;
+    virtual int labelOfFirstNbrInState(std::initializer_list<State> states, int startLabel = 0, bool ignoreImmobParticles = true) const;
 
     // Checks whether this particle has a neighbor in any of the given states.
     bool hasNbrInState(std::initializer_list<State> states) const;
+    int nextHexagonDir(int orientation) const;
+    bool canRetire() const;
+    bool hasTailChild() const;
+    const std::vector<int>  conTailChildLabels() const;
 
 
     //bool doesEnclosureOccur(std::set<Node>& occupied, Node testNode);
@@ -111,6 +119,8 @@ public:
 protected:
     // General state of this particle.
     State state;
+    int _parentDir;   // Corresponds to "parent" in paper.
+    int _hexagonDir;
      QOpenGLFunctions_2_0* glfn;
     // Line recovery specific variables of this particle:
 
