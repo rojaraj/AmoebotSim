@@ -18,6 +18,7 @@ Immobilizedparticles::Immobilizedparticles(const Node head,
     state(state),
     moveDir(-1),
     followDir(-1),
+    constructionDir(-1),
     leaderToken(false),
     tokenForwardDir(-1),
     tokenCurrentDir(-1),
@@ -35,7 +36,9 @@ Immobilizedparticles::Immobilizedparticles(const Node head,
 
 void Immobilizedparticles::activate() {
     printf("Activating particle. Current state: %d\n", state);
-
+    if(isInState({State::FollowerHex,State::Lead,State::Seed, State::Finish})){
+        activateHex();
+    }
     try {
         if (leaderToken) {
             printf("Particle has received the leader token.\n");
@@ -177,80 +180,141 @@ void Immobilizedparticles::activate() {
 
 }
 
-
 void Immobilizedparticles::activateHex() {
     // alpha_1: idle or follower particles with a seed or retired neighbor become
     // roots and begin traversing the hexagon's surface.
     if(isInState({State::Leader})){
-        state=State::Seed;
-}
+        state = State::Seed;
+    }
     if(isInState({State::Follower})){
-        state=State::FollowerHex;
+        state = State::FollowerHex;
     }
 
-    if (isContracted()
-        && (isInState({State::FollowerHex}))
-        && hasNbrInState({State::Seed, State::Retired})) {
-         printf("Fail 2");
-        _parentDir = -1;
-        state = State::Root;
-        _hexagonDir = nextHexagonDir(1);  // clockwise.
-
+    if (isExpanded()) {
+        if (state == State::FollowerHex) {
+            if (!hasNbrInState({State::Idle}) && !hasTailFollower()) {
+                contractTail();
+            }
+            return;
+        } else if (state == State::Lead) {
+            if (!hasNbrInState({State::Idle}) && !hasTailFollower()) {
+                contractTail();
+                updateMoveDir();
+            }
+            return;
+        } else {
+            Q_ASSERT(false);
+        }
+    } else {
+        if (state == State::Seed) {
+            return;
+        } else if (state == State::Idle) {
+            if (hasNbrInState({State::Seed, State::Finish})) {
+                state = State::Lead;
+                updateMoveDir();
+                return;
+            } else if (hasNbrInState({State::Lead, State::FollowerHex})) {
+                state = State::FollowerHex;
+                followDir = labelOfFirstNbrInState({State::Lead, State::FollowerHex});
+                return;
+            }
+        } else if (state == State::FollowerHex) {
+            if (hasNbrInState({State::Seed, State::Finish})) {
+                state = State::Lead;
+                updateMoveDir();
+                return;
+            } else if (hasTailAtLabel(followDir)) {
+                auto nbr = nbrAtLabel(followDir);
+                int nbrContractionDir = nbrDirToDir(nbr, (nbr.tailDir() + 3) % 6);
+                push(followDir);
+                followDir = nbrContractionDir;
+                return;
+            }
+        } else if (state == State::Lead) {
+            if (canFinish())  {
+                state = State::Finish;
+                updateConstructionDir();
+                return;
+            } else {
+                updateMoveDir();
+                if (!hasNbrAtLabel(moveDir)) {
+                    expand(moveDir);
+                } else if (hasTailAtLabel(moveDir)) {
+                    push(moveDir);
+                }
+                return;
+            }
+        }
     }
-
-    // alpha_3: contracted roots with no idle neighbors who are pointed at by a
-    // retired or seed particle's construction direction retire.
-
-    else if (isContracted()
-             && state == State::Root
-             && !hasNbrInState({State::Idle})
-             && canRetire()) {
-          printf("Fail 4");
-        _hexagonDir = nextHexagonDir(-1);  // counter-clockwise.
-        state = State::Retired;
-
-    }
-    // alpha_4: contracted roots that can expand along the surface of the hexagon
-    // do so.
-
-    else if (isContracted()
-             && state == State::Root
-             && !hasNbrAtLabel(_hexagonDir)) {
-        expand(_hexagonDir);
-    }
-    // alpha_5: expanded followers and roots without idle neighbors but with a
-    // tail child pull a tail child in a handover.
-    else if (isExpanded()
-             && ( state == State::FollowerHex || state == State::Root)
-             && !hasNbrInState({State::Idle})
-             && !conTailChildLabels().empty()) {
-         printf("Fail 5");
-        if (state == State::Root)
-            _hexagonDir = nextHexagonDir(1);  // clockwise.
-        int childLabel = conTailChildLabels()[0];
-        nbrAtLabel(childLabel)._parentDir = dirToNbrDir(nbrAtLabel(childLabel),
-                                                        (tailDir() + 3) % 6);
-        pull(childLabel);
-
-    }
-
-    // alpha_6: expanded followers and roots without idle neighbors or tail
-    // children contract their tails.
-    else if (isExpanded()
-             && (state == State::FollowerHex || state == State::Root)
-             && !hasNbrInState({State::Idle})
-             && !hasTailChild()) {
-         printf("Fail 6");
-        if (state == State::Root)
-            _hexagonDir = nextHexagonDir(1);  // clockwise.
-        contractTail();
-
-    }
-
-
-
-
 }
+
+bool Immobilizedparticles::hasTailFollower() const {
+    auto prop = [&](const Immobilizedparticles& p) {
+        return p.state == State::FollowerHex &&
+               pointsAtMyTail(p, p.dirToHeadLabel(p.followDir));
+    };
+
+    return labelOfFirstNbrWithProperty<Immobilizedparticles>(prop) != -1;
+}
+
+int Immobilizedparticles::constructionReceiveDir() const {
+    auto prop = [&](const Immobilizedparticles& p) {
+        // Debugging: Print the current state and direction of the neighbor
+        printf("Checking neighbor with state: %d, constructionDir: %d\n", p.state, p.constructionDir);
+
+        // Check if the constructionDir is valid
+        if (p.constructionDir < 0 || p.constructionDir >= 10) {
+            printf("Invalid constructionDir: %d\n", p.constructionDir);
+            return false;
+        }
+
+        // Check if the particle is in a contracted state and has the appropriate neighbor state
+        bool isNeighborPointingAtMe = pointsAtMe(p, p.dirToHeadLabel(p.constructionDir));
+        bool validNeighborState = (p.state == State::Seed || p.state == State::Finish);
+
+        printf("isContracted: %d, isNeighborPointingAtMe: %d, validNeighborState: %d\n",
+               isContracted(), isNeighborPointingAtMe, validNeighborState);
+
+        return isContracted() && validNeighborState && isNeighborPointingAtMe;
+    };
+
+    int result = labelOfFirstNbrWithProperty<Immobilizedparticles>(prop);
+
+    // Debugging: Print the result
+    printf("constructionReceiveDir result: %d\n", result);
+
+    return result;
+}
+
+bool Immobilizedparticles::canFinish() const {
+    return constructionReceiveDir() != -1;
+}
+
+void Immobilizedparticles::updateConstructionDir() {
+    // Hexagon construction.
+    constructionDir = constructionReceiveDir();
+    printf("Initial constructionDir: %d\n", constructionDir);
+
+    if (constructionDir < 0 || constructionDir >= 10) {
+        printf("Invalid constructionDir after constructionReceiveDir: %d\n", constructionDir);
+        constructionDir = 0; // Or some valid fallback
+    }
+
+    // Adjust constructionDir based on neighbor states
+    if (nbrAtLabel(constructionDir).state == State::Seed) {
+        constructionDir = (constructionDir + 1) % 6;
+    } else {
+        constructionDir = (constructionDir + 2) % 6;
+    }
+
+    if (hasNbrAtLabel(constructionDir) &&
+        nbrAtLabel(constructionDir).state == State::Finish) {
+        constructionDir = (constructionDir + 1) % 6;
+    }
+
+    printf("Final constructionDir: %d\n", constructionDir);
+}
+
 
 int Immobilizedparticles::nextClockwiseDir(int inputDir) {
     return (inputDir + 1) % 6;
@@ -389,13 +453,14 @@ bool Immobilizedparticles::areAllClusterAndIdleParticlesFollowers() {
 }
 
 void Immobilizedparticles::updateMoveDir() {
-    moveDir = labelOfFirstNbrInState({State::Follower, State::Leader});
-    while (hasNbrAtLabel(moveDir) && (nbrAtLabel(moveDir).state == State::Follower ||
-                                      nbrAtLabel(moveDir).state == State::Leader))
+    moveDir = labelOfFirstNbrInState({State::Seed, State::Finish});
+    while (hasNbrAtLabel(moveDir) && (nbrAtLabel(moveDir).state == State::Seed ||
+                                      nbrAtLabel(moveDir).state == State::Finish))
     {
         moveDir = (moveDir + 5) % 6;
     }
 }
+
 
 
 
@@ -471,6 +536,7 @@ void Immobilizedparticles::performMovement2() {
                 printf("Expansion to label: %d would disconnect, backtracking.\n", elem);
                 if (isExpanded()) {
                     contractHead();
+
                 }
                 state = originalState;
                 head = originalHead;
@@ -713,54 +779,6 @@ ImmobilizedParticleSystem::ImmobilizedParticleSystem(int numParticles, int numIm
     }
 }
 
-bool ImmobilizedParticleSystem::hasTerminated() const {
-#ifdef QT_DEBUG
-    if (!isConnected(particles)) {
-        return true;
-    }
-#endif
-
-    bool terminationConditionMet = false;
-
-    // This process repeats until all particles are in the Retired or Seed states.
-    while (!terminationConditionMet) {
-        terminationConditionMet = true;
-        for (auto p : particles) {
-            auto hp = dynamic_cast<Immobilizedparticles*>(p);
-            // Check if particle is in an invalid state that prevents termination
-            if (hp->isInState({Immobilizedparticles::State::Idle}) ||
-                hp->isInState({Immobilizedparticles::State::Cluster}) ||
-                !hp->freeState || !hp->lineState || hp->isExpanded()) {
-                return false;  // Not terminated
-            }
-            // Check if particle is in a state that requires further processing
-            if (hp->isInState({Immobilizedparticles::State::Leader}) ||
-                hp->isInState({Immobilizedparticles::State::Follower}) ||
-                hp->isInState({Immobilizedparticles::State::FollowerHex}) ||
-                hp->isInState({Immobilizedparticles::State::Root})) {
-                terminationConditionMet = false;
-            }
-        }
-
-        if (!terminationConditionMet) {
-            for (auto p : particles) {
-                auto hp = dynamic_cast<Immobilizedparticles*>(p);
-                // Check if particle is in a state that requires activation
-                if (hp->isInState({Immobilizedparticles::State::Leader}) ||
-                    hp->isInState({Immobilizedparticles::State::Follower}) ||
-                    hp->isInState({Immobilizedparticles::State::FollowerHex}) ||
-                    hp->isInState({Immobilizedparticles::State::Root})) {
-                    // Call activateHex() specifically for these states
-                    //hp->activateHex();
-                }
-            }
-        }
-    }
-
-    return true;  // All particles are in Retired or Seed states
-}
-
-
 // bool ImmobilizedParticleSystem::hasTerminated() const {
 // #ifdef QT_DEBUG
 //     if (!isConnected(particles)) {
@@ -768,35 +786,83 @@ bool ImmobilizedParticleSystem::hasTerminated() const {
 //     }
 // #endif
 
-//     bool leaderExists = false;
-//     for (auto p : particles) {
-//         auto hp = dynamic_cast<Immobilizedparticles*>(p);
-//         if (hp->isInState({Immobilizedparticles::State::Idle}) || hp->isInState({Immobilizedparticles::State::Cluster}) || !hp->freeState || !hp->lineState || hp->isExpanded()) {
-//             return false;
-//         }
-//         if(hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})){
+//     bool terminationConditionMet = false;
 
-//                 if (hp->isInState({Immobilizedparticles::State::Leader})) {
-//                     leaderExists = true;
-
-//                 }
-//                //hp->activateHex();
+//     // This process repeats until all particles are in the Retired or Seed states.
+//     while (!terminationConditionMet) {
+//         terminationConditionMet = true;
+//         for (auto p : particles) {
+//             auto hp = dynamic_cast<Immobilizedparticles*>(p);
+//             // Check if particle is in an invalid state that prevents termination
+//             if (hp->isInState({Immobilizedparticles::State::Idle}) ||
+//                 hp->isInState({Immobilizedparticles::State::Cluster}) ||
+//                 !hp->freeState || !hp->lineState || hp->isExpanded()) {
+//                 return false;  // Not terminated
 //             }
+//             // Check if particle is in a state that requires further processing
+//             if (hp->isInState({Immobilizedparticles::State::Leader}) ||
+//                 hp->isInState({Immobilizedparticles::State::Follower}) ||
+//                 hp->isInState({Immobilizedparticles::State::FollowerHex}) ||
+//                 hp->isInState({Immobilizedparticles::State::Root})) {
+//                 terminationConditionMet = false;
+//             }
+//         }
 
-
-// }
-
-// if (leaderExists) {
-//     for (auto p : particles) {
-//         auto hp = dynamic_cast<Immobilizedparticles*>(p);
-//         if (hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})) {
-//             hp->activateHex();
+//         if (!terminationConditionMet) {
+//             for (auto p : particles) {
+//                 auto hp = dynamic_cast<Immobilizedparticles*>(p);
+//                 // Check if particle is in a state that requires activation
+//                 if (hp->isInState({Immobilizedparticles::State::Leader}) ||
+//                     hp->isInState({Immobilizedparticles::State::Follower}) ||
+//                     hp->isInState({Immobilizedparticles::State::FollowerHex}) ||
+//                     hp->isInState({Immobilizedparticles::State::Root})) {
+//                     // Call activateHex() specifically for these states
+//                     //hp->activateHex();
+//                 }
+//             }
 //         }
 //     }
+
+//     return true;  // All particles are in Retired or Seed states
 // }
 
-//     return leaderExists;
-// }
+
+bool ImmobilizedParticleSystem::hasTerminated() const {
+#ifdef QT_DEBUG
+    if (!isConnected(particles)) {
+        return true;
+    }
+#endif
+
+    bool leaderExists = false;
+    for (auto p : particles) {
+        auto hp = dynamic_cast<Immobilizedparticles*>(p);
+        if (hp->isInState({Immobilizedparticles::State::Idle}) || hp->isInState({Immobilizedparticles::State::Cluster}) || !hp->freeState || !hp->lineState || hp->isExpanded()) {
+            return false;
+        }
+        if(hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})){
+
+                if (hp->isInState({Immobilizedparticles::State::Leader})) {
+                    leaderExists = true;
+
+                }
+               //hp->activateHex();
+            }
+
+
+}
+
+if (leaderExists) {
+    for (auto p : particles) {
+        auto hp = dynamic_cast<Immobilizedparticles*>(p);
+        if (hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})) {
+            hp->activateHex();
+        }
+    }
+}
+
+    return leaderExists;
+}
 
 
 
@@ -829,9 +895,12 @@ int Immobilizedparticles::headMarkColor() const {
     case State::FollowerHex:       return 0x00FFEF; // Fluorescent Blue
     case State::ClusterLead:  return 0xFF1493; // Fluorescent PinkGreen
     case State::ClusterMark:  return 0x00FFEF;
-    case State::Seed:      return 0xFF1493;
+    case State::Seed:      return 0xFF1493; //pink
     case State::Root:      return 0xff0000;  // red
     case State::Retired:   return 0x000000;  // black
+    case State::Finish:   return 0x000000; //black
+    case State::Lead:   return 0xff0000; //red
+    case State::Idle:   return 0xff8800;
             // Fluorescent Blue
     default:                  return -1;
     }

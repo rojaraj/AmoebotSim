@@ -27,7 +27,10 @@ public:
         Cluster,
         Seed,
         Retired,
-        Root        // non-immobilized particle which is not a part of the spanning forest
+        Root,
+        Lead,
+        Finish,
+        Idle2        // non-immobilized particle which is not a part of the spanning forest
 
 
     };
@@ -52,6 +55,23 @@ public:
     int nextClockwiseDir(int inputDir);
     int nextCounterclockwiseDir(int inputDir);
 
+    int constructionReceiveDir() const;
+
+    // Checks whether this particle is occupying the next position to be filled.
+    bool canFinish() const;
+
+    // Sets this particle's constructionDir to point at the next position to be
+    // filled as it is finishing.
+    void updateConstructionDir();
+
+    // Updates this particle's moveDir when it is a leader to traverse the current
+    // surface of the forming shape counter-clockwise.
+    void updateMoveDir();
+
+    // Checks whether this particle has an immediate child in the spanning tree
+    // following its tail.
+    bool hasTailFollower() const;
+
     virtual void passLeaderToken(const int label);
     virtual void performMovement();
 
@@ -59,7 +79,7 @@ public:
     virtual void performMovement2();
     virtual void updateBoolStates();
 
-    virtual void updateMoveDir();
+    //virtual void updateMoveDir();
 
     virtual std::vector<int> randLabels();
 
@@ -127,6 +147,7 @@ protected:
     // Movement direction markers for the Leader and Followers.
     int moveDir;
     int followDir;
+    int constructionDir;
 
     // Token to be passed around when a new Leader is required.
     bool leaderToken;
