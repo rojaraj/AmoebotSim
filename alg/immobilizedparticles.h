@@ -52,6 +52,7 @@ public:
 
     virtual void tryToBecomeLeader();
     virtual void activateHex();
+    //virtual void updateState();
     int nextClockwiseDir(int inputDir);
     int nextCounterclockwiseDir(int inputDir);
 

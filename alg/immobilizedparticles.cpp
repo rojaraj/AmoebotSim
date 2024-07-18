@@ -31,6 +31,9 @@ Immobilizedparticles::Immobilizedparticles(const Node head,
 {
     _borderColors.fill(-1);
     _borderPointColors.fill(-1);
+    if (state == State::Seed) {
+        constructionDir = 0;
+    }
 }
 
 
@@ -40,6 +43,12 @@ void Immobilizedparticles::activate() {
         activateHex();
     }
     try {
+
+        //phase 1: state change -updateState() - check if all particles have changed state from idle to some other state
+        //updateState();
+        //phase 2:
+
+
         if (leaderToken) {
             printf("Particle has received the leader token.\n");
             tryToBecomeLeader();
@@ -166,10 +175,10 @@ void Immobilizedparticles::activate() {
         if (!isInState({State::Idle, State::Immo, State::Cluster, State::Root, State::Retired, State::Seed, State::FollowerHex})) {
             performMovement();
         }
-        // auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
-        // if (immobilizedSystem) {
-        //     immobilizedSystem->printAllParticleStates();
-        // }
+        auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
+        if (immobilizedSystem) {
+            immobilizedSystem->printAllParticleStates();
+        }
     } catch (const std::exception& e) {
         printf("Exception occurred: %s\n", e.what());
     } catch (...) {
@@ -180,14 +189,140 @@ void Immobilizedparticles::activate() {
 
 }
 
+// void Immobilizedparticles::updateState(){
+//     if (isInState({State::Idle})) {
+//         printf("Particle is idle, trying to follow a neighbor.\n");
+
+//         bool hasLeaderOrFollowerNeighbor = false;
+
+//         for (int label : randLabels()) {
+//             if (hasNbrAtLabel(label)) {
+//                 auto& nbr = nbrAtLabel(label);
+//                 printf("Follow dir: Neighbour:: %d\n", nbr.followDir);
+
+//                 if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir)))
+//                     || (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
+//                     followDir = labelToDir(label);
+//                     state = State::Follower;
+//                     printf("Following neighbor at label: %d\n", label);
+//                     return;
+//                 }else if (nbr.isInState({State::Leader})) {
+//                     // Handle the case where the neighbor is a leader
+//                     followDir = labelToDir(label); // Set the follow direction to the direction of the leader
+//                     state = State::Follower; // Change the particle's state to follower
+//                     nbr.moveDir = followDir; // Set the direction of the leader to the direction of the follower
+//                     return;}
+
+//                 else if (nbr.isInState({State::Leader}) || nbr.isInState({State::Follower})) {
+//                     hasLeaderOrFollowerNeighbor = true;
+//                 }
+//             }
+//         }
+
+//         if (!hasLeaderOrFollowerNeighbor) {
+//             for (int label : randLabels()) {
+//                 if (hasNbrAtLabel(label)) {
+//                     auto& nbr = nbrAtLabel(label);
+//                     if (nbr.isInState({State::Immo}) || nbr.isInState({State::Idle}) || nbr.isInState({State::Cluster})) {
+//                         followDir = labelToDir(label);
+//                         state = State::Cluster;
+//                         nbr.moveDir = followDir;
+//                         printf("No leader or follower neighbor found, changing state to Cluster.\n");
+//                         break;
+//                     }
+//                 }
+//             }
+
+
+
+//         }
+//     } else if (isInState({State::Leader})) {
+//         if (moveDir == -1) {
+//             moveDir = randDir();
+//         }
+//         // if (!areAllClusterAndIdleParticlesFollowers()) {
+//         //     printf("Waiting for all Cluster and Idle particles to become Followers.\n");
+
+//         // } else {
+
+//         //     if (isContracted() && !canExpand(dirToHeadLabel(moveDir))) {
+//         //         bool changed = false;
+//         //         for (int label : randLabels()) {
+//         //             moveDir = labelToDir(label);
+//         //             if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
+//         //                 if (isExpanded()) {
+//         //                     makeHeadLabel(label);
+//         //                 }
+//         //                 changed = true;
+//         //                 break;
+//         //             }
+//         //         }
+
+//         //         if (!changed) {
+//         //             int label = labelOfFirstNbrInState({State::Idle, State::Follower});
+//         //             if (label >= 0) {
+//         //                 passLeaderToken(label);
+//         //                 moveDir = -1;
+//         //             } else {
+//         //                 // This can only happen if the Leader is the only particle and it is
+//         //                 // surrounded by objects.
+//         //                 // So basically never, unless you are testing weird edge cases.
+//         //             }
+//         //         }
+//         //     }
+//         // }
+//     }
+//     else if (isInState({State::Immo})) {
+//         printf("Particle is immobile. Forwarding communication without changing state.\n");
+//         followDir = labelToDir(label);
+//         // for (int label : randLabels()) {
+//         //     if (hasNbrAtLabel(label)) {
+//         //         auto& nbr = nbrAtLabel(label);
+//         //         if (nbr.isInState({State::Follower, State::Leader, State::Idle, State::Cluster})) {
+//         //             printf("Immo :: Communication forwarded to neighbor: Not follower? %d\n", areAllClusterAndIdleParticlesFollowers());
+//         //             if(!areAllClusterAndIdleParticlesFollowers()){
+//         //                 nbr.activate();
+//         //                 printf("Immo :: Communication forwarded to neighbor at label: %d\n", label);
+//         //             }
+//         //         }
+//         //     }
+//         // }
+//     } else if (isInState({State::Cluster})) {
+//         printf("Particle is Cluster. Forwarding communication without changing state.\n");
+//         for (int label : randLabels()) {
+//             if (hasNbrAtLabel(label)) {
+//                 auto& nbr = nbrAtLabel(label);
+
+//                 if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir)))
+//                     || (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
+//                     followDir = labelToDir(label);
+//                     state = State::Follower;
+//                     printf("Following neighbor at label - Try 2: %d\n", label);
+//                     return;
+//                 }
+//                 // else if (nbr.isInState({State::Cluster, State::Immo})) {
+//                 //     printf("Performing Movement 2\n");
+//                 //     performMovement2();
+//                 //     if (state != State::Cluster) {
+//                 //         return;
+//                 //     }
+//                 // }
+//             }
+//         }
+//     }
+// }
+
 void Immobilizedparticles::activateHex() {
-    // alpha_1: idle or follower particles with a seed or retired neighbor become
+    // alpha_1: Idle or follower particles with a seed or retired neighbor become
     // roots and begin traversing the hexagon's surface.
-    if(isInState({State::Leader})){
+    if (isInState({State::Leader})) {
         state = State::Seed;
     }
-    if(isInState({State::Follower})){
+    if (isInState({State::Follower})) {
         state = State::FollowerHex;
+    }
+    if (state == State::Seed) {
+        constructionDir = 0;
     }
 
     if (isExpanded()) {
@@ -203,7 +338,7 @@ void Immobilizedparticles::activateHex() {
             }
             return;
         } else {
-            Q_ASSERT(false);
+            Q_ASSERT(false); // This case should not happen
         }
     } else {
         if (state == State::Seed) {
@@ -224,7 +359,7 @@ void Immobilizedparticles::activateHex() {
                 updateMoveDir();
                 return;
             } else if (hasTailAtLabel(followDir)) {
-                auto nbr = nbrAtLabel(followDir);
+                auto& nbr = nbrAtLabel(followDir);
                 int nbrContractionDir = nbrDirToDir(nbr, (nbr.tailDir() + 3) % 6);
                 push(followDir);
                 followDir = nbrContractionDir;
@@ -262,45 +397,35 @@ int Immobilizedparticles::constructionReceiveDir() const {
         // Debugging: Print the current state and direction of the neighbor
         printf("Checking neighbor with state: %d, constructionDir: %d\n", p.state, p.constructionDir);
 
-        // Check if the constructionDir is valid
-        if (p.constructionDir < 0 || p.constructionDir >= 10) {
-            printf("Invalid constructionDir: %d\n", p.constructionDir);
-            return false;
-        }
+        return isContracted() &&
+               (p.state == State::Seed || p.state == State::Finish) &&
+               pointsAtMe(p, p.constructionDir);
 
-        // Check if the particle is in a contracted state and has the appropriate neighbor state
-        bool isNeighborPointingAtMe = pointsAtMe(p, p.dirToHeadLabel(p.constructionDir));
-        bool validNeighborState = (p.state == State::Seed || p.state == State::Finish);
+};
 
-        printf("isContracted: %d, isNeighborPointingAtMe: %d, validNeighborState: %d\n",
-               isContracted(), isNeighborPointingAtMe, validNeighborState);
+int result = labelOfFirstNbrWithProperty<Immobilizedparticles>(prop);
 
-        return isContracted() && validNeighborState && isNeighborPointingAtMe;
-    };
+// Debugging: Print the result
+printf("constructionReceiveDir result: %d\n", result);
 
-    int result = labelOfFirstNbrWithProperty<Immobilizedparticles>(prop);
-
-    // Debugging: Print the result
-    printf("constructionReceiveDir result: %d\n", result);
-
-    return result;
+return result;
 }
 
 bool Immobilizedparticles::canFinish() const {
-    return constructionReceiveDir() != -1;
+    int receiveDir = constructionReceiveDir();
+    printf("canFinish: constructionReceiveDir: %d\n", receiveDir);
+    return receiveDir != -1;
 }
 
 void Immobilizedparticles::updateConstructionDir() {
-    // Hexagon construction.
     constructionDir = constructionReceiveDir();
     printf("Initial constructionDir: %d\n", constructionDir);
 
-    if (constructionDir < 0 || constructionDir >= 10) {
+    if (constructionDir < 0 || constructionDir >= 6) {
         printf("Invalid constructionDir after constructionReceiveDir: %d\n", constructionDir);
         constructionDir = 0; // Or some valid fallback
     }
 
-    // Adjust constructionDir based on neighbor states
     if (nbrAtLabel(constructionDir).state == State::Seed) {
         constructionDir = (constructionDir + 1) % 6;
     } else {
@@ -311,11 +436,7 @@ void Immobilizedparticles::updateConstructionDir() {
         nbrAtLabel(constructionDir).state == State::Finish) {
         constructionDir = (constructionDir + 1) % 6;
     }
-
-    printf("Final constructionDir: %d\n", constructionDir);
 }
-
-
 int Immobilizedparticles::nextClockwiseDir(int inputDir) {
     return (inputDir + 1) % 6;
 }
