@@ -34,6 +34,19 @@ public:
 
 
     };
+    enum class Phase {
+        LeaderElection,
+        InitializeTrees,
+        MoveToTargetTree
+    };
+
+    Phase phase;
+
+
+    //void leaderElection();
+
+    //void moveToTargetTree();
+
 
     // Constructs a new particle with a node position for its head, a global
     // compass direction from its head to its tail (-1 if contracted), an offset
@@ -43,13 +56,16 @@ public:
 
     // Executes one particle activation.
     virtual void activate();
+    virtual void initializeTrees();
+    bool isImmobilized() const;
 
-
+    std::vector<int> childLabels() ;
+    bool hasNbrWithFollowDir2Unset();
     //NON-IMMO state change
     //void changeStateOfNonImmobilizedParticles();
     //Get neighbour labels
     //virtual std::vector<int> getNbrLabels() const;
-
+    bool tree2Ack;
     virtual void tryToBecomeLeader();
     virtual void activateHex();
     //virtual void updateState();
@@ -71,20 +87,20 @@ public:
 
     // Checks whether this particle has an immediate child in the spanning tree
     // following its tail.
-    bool hasTailFollower() const;
+    //bool hasTailFollower() const;
 
-    virtual void passLeaderToken(const int label);
-    virtual void performMovement();
+    //virtual void passLeaderToken(const int label);
+    //virtual void performMovement();
 
     bool areAllClusterAndIdleParticlesFollowers();
-    virtual void performMovement2();
-    virtual void updateBoolStates();
+    //virtual void performMovement2();
+    //virtual void updateBoolStates();
 
     //virtual void updateMoveDir();
 
     virtual std::vector<int> randLabels();
 
-    virtual bool hasBlockingTailNbr() const;
+    //virtual bool hasBlockingTailNbr() const;
 
     // Functions for altering a particle's cosmetic appearance.
     // particleColor returns the color to be used for the particle.
@@ -147,7 +163,8 @@ protected:
 
     // Movement direction markers for the Leader and Followers.
     int moveDir;
-    int followDir;
+    int followDir1;
+    int followDir2;
     int constructionDir;
 
     // Token to be passed around when a new Leader is required.
