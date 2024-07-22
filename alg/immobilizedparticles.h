@@ -1,3 +1,5 @@
+
+
 //immo_shape working .h file
 #ifndef Immobilizedparticles_H
 #define Immobilizedparticles_H
@@ -57,6 +59,7 @@ public:
     // Executes one particle activation.
     virtual void activate();
     virtual void initializeTrees();
+    virtual void leaderElection();
     bool isImmobilized() const;
 
     std::vector<int> childLabels() ;
@@ -214,6 +217,7 @@ public:
 
     // Checks whether or not the system's run of the ShapeFormation formation
     // algorithm has terminated (all particles finished).
+      bool hasLeader() const;
     bool hasTerminated() const override;
 };
 #endif // Immobilizedparticles_H

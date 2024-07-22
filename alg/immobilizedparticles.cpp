@@ -38,50 +38,93 @@ Immobilizedparticles::Immobilizedparticles(const Node head,
     }
 }
 
-
 void Immobilizedparticles::activate() {
     printf("Activating particle. Current state: %d\n", state);
-    if(isInState({State::FollowerHex,State::Lead,State::Seed, State::Finish})){
+
+    if (isInState({State::FollowerHex, State::Lead, State::Seed, State::Finish})) {
         activateHex();
     }
-    phase = Phase::InitializeTrees;
+
+    auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
+
+    if (!immobilizedSystem) {
+        printf("Error: Particle system not found!\n");
+        return;
+    }
+
+    // Ensure proper phase transitions
+    if (!immobilizedSystem->hasLeader() && phase != Phase::LeaderElection) {
+        phase = Phase::LeaderElection;
+    } else if (immobilizedSystem->hasLeader() && phase == Phase::LeaderElection) {
+        phase = Phase::InitializeTrees;
+    }
+
     switch (phase) {
     case Phase::LeaderElection:
-        //leaderElection();
+        leaderElection();
         break;
     case Phase::InitializeTrees:
         initializeTrees();
         break;
     case Phase::MoveToTargetTree:
-        //moveToTargetTree();
-        printf("I have reached here");
+        // moveToTargetTree();
+        printf("I have reached here\n");
         break;
     default:
         // Handle unexpected phase
-        printf("Error: Invalid phase encountered!");
+        printf("Error: Invalid phase encountered!\n");
         break;
     }
 }
 
+bool ImmobilizedParticleSystem::hasLeader() const {
+    // Check if there is any particle in the system with state Leader
+    for (const auto& p : particles) {
+        auto* immobileParticle = dynamic_cast<const Immobilizedparticles*>(p);
+        if (immobileParticle && immobileParticle->isInState({Immobilizedparticles::State::Leader})) {
+            return true;
+        }
+    }
+    return false;
+}
 
+void Immobilizedparticles::leaderElection() {
+    // Implement leader election logic here
+    // For now, assume the first particle that calls this becomes the leader
+    if (state == State::Leader) {
+       // state = State::Leader;
+        phase = Phase::InitializeTrees;
+    }
+}
 
+void Immobilizedparticles::initializeTrees() {
+    bool followDir2Set = (followDir2 != -1); // Flag to check if followDir2 has been set
 
-void Immobilizedparticles::initializeTrees(){
-
-    //iterate over neighbour particles
+    // Iterate over neighbor particles
     for (int label : randLabels()) {
         if (hasNbrAtLabel(label)) {
             auto& nbr = nbrAtLabel(label);
+
             if (nbr.state == State::Leader) {
+                // Set both followDir1 and followDir2 if a Leader is found
                 followDir1 = label;
-                followDir2 = label;
+                if (!followDir2Set) {
+                    followDir2 = label;
+                    followDir2Set = true; // Mark followDir2 as set
+                }
             } else if (nbr.followDir2 != -1) {
-                followDir2 = label;
+                // Update followDir2 only if it hasn't been set yet
+                if (!followDir2Set) {
+                    followDir2 = label;
+                    followDir2Set = true; // Mark followDir2 as set
+                }
             } else if (!isImmobilized() && nbr.followDir1 != -1) {
                 followDir1 = label;
             }
         }
     }
+
+    // Handle tree2Ack logic
     bool allChildrenAck = true;
     for (int label : childLabels()) {
         if (hasNbrAtLabel(label)) {
@@ -96,33 +139,33 @@ void Immobilizedparticles::initializeTrees(){
     if (allChildrenAck && !hasNbrWithFollowDir2Unset()) {
         tree2Ack = true;
     }
+
     // Leader realizes that tree initialization has finished
     if (state == State::Leader && tree2Ack) {
         phase = Phase::MoveToTargetTree;
+    }
+}
 
 
-}
-}
 bool Immobilizedparticles::isImmobilized() const {
-            return isInState({State::Immo});
-        }
+    return isInState({State::Immo});
+}
 
-
-
-std::vector<int> Immobilizedparticles::childLabels()  {
-            std::vector<int> children;
-            for (int label : randLabels()) {
-                if (hasNbrAtLabel(label)) {
-                    const auto& nbr = nbrAtLabel(label);
-                    // Assuming children are determined by followDir or specific states
-                    if (nbr.followDir1 == label || nbr.followDir2 == label) {
-                        children.push_back(label);
-                    }
-                }
+std::vector<int> Immobilizedparticles::childLabels() {
+    std::vector<int> children;
+    for (int label : randLabels()) {
+        if (hasNbrAtLabel(label)) {
+            const auto& nbr = nbrAtLabel(label);
+            // Assuming children are determined by followDir or specific states
+            if (nbr.followDir1 == label || nbr.followDir2 == label) {
+                children.push_back(label);
             }
-            return children;
         }
-bool Immobilizedparticles::hasNbrWithFollowDir2Unset()  {
+    }
+    return children;
+}
+
+bool Immobilizedparticles::hasNbrWithFollowDir2Unset() {
     // Iterate through all potential neighbor labels
     for (int label : randLabels()) {
         // Check if there is a neighbor at the current label
@@ -1044,33 +1087,72 @@ ImmobilizedParticleSystem::ImmobilizedParticleSystem(int numParticles, int numIm
 //     return true;  // All particles are in Retired or Seed states
 // }
 
-
 bool ImmobilizedParticleSystem::hasTerminated() const {
 #ifdef QT_DEBUG
     // Check if the system is connected
     if (!isConnected(particles)) {
-        return true;
+        printf("System is not connected.\n");
+        return false; // System is not connected; termination cannot occur
     }
 #endif
 
-    // Iterate through particles to check for termination condition
+    // Variables to track termination conditions
+    //bool allParticlesInitialized = true;
+    bool allParticlesHaveValidFollowDir2 = true;
+
+    // Iterate through particles to check for termination conditions
     for (const auto& p : particles) {
         auto hp = dynamic_cast<const Immobilizedparticles*>(p);
         if (hp) {
             // Check if all particles have gone through the initializeTrees phase
-            if (hp->phase != Immobilizedparticles::Phase::MoveToTargetTree) {
-                return false;
-            }
-            // Check for termination condition
-            if (hp->state == Immobilizedparticles::State::Leader && hp->tree2Ack && hp->phase == Immobilizedparticles::Phase::MoveToTargetTree) {
-                return true;
+            // if (hp->phase != Immobilizedparticles::Phase::MoveToTargetTree) {
+            //     allParticlesInitialized = false;
+            // }
+            // Check if all particles have a valid followDir2 value
+            if (hp->followDir2 == -1) {
+                allParticlesHaveValidFollowDir2 = false;
             }
         }
     }
 
-    // Return false if no terminating condition is met
-    return false;
+    // Debugging output
+    // if (!allParticlesInitialized) {
+    //     printf("Not all particles have reached the MoveToTargetTree phase.\n");
+    // }
+    if (!allParticlesHaveValidFollowDir2) {
+        printf("Not all particles have valid followDir2 values.\n");
+    }
+
+    // Return true if all particles are initialized and have valid followDir2 values
+    return   allParticlesHaveValidFollowDir2;
 }
+
+// bool ImmobilizedParticleSystem::hasTerminated() const {
+// #ifdef QT_DEBUG
+//     // Check if the system is connected
+//     if (!isConnected(particles)) {
+//         return true;
+//     }
+// #endif
+
+//     // Iterate through particles to check for termination condition
+//     for (const auto& p : particles) {
+//         auto hp = dynamic_cast<const Immobilizedparticles*>(p);
+//         if (hp) {
+//             // Check if all particles have gone through the initializeTrees phase
+//             if (hp->phase != Immobilizedparticles::Phase::MoveToTargetTree) {
+//                 return false;
+//             }
+//             // Check for termination condition
+//             if (hp->state == Immobilizedparticles::State::Leader && hp->tree2Ack && hp->followDir2 !=-1 && hp->phase == Immobilizedparticles::Phase::MoveToTargetTree) {
+//                 return true;
+//             }
+//         }
+//     }
+
+//     // Return false if no terminating condition is met
+//     return false;
+// }
 
 //     bool leaderExists = false;
 //     for (auto p : particles) {
@@ -1127,7 +1209,7 @@ int Immobilizedparticles::particleColor() const {
 int Immobilizedparticles::headMarkColor() const {
     // The color of the circle around the particle.
     switch (state) {
-    case State::Leader:       return 0xff8800; // orange
+    case State::Leader:       return 0x00FFEF; // Fluorescent Blue
     case State::Follower:     return 0x0000ff; // blue
     case State::Immo:         return 0xFF0000; //red
     case State::Cluster:      return 0x39FF14; // Fluorescent Green
