@@ -52,9 +52,10 @@ public:
 
     // Executes one particle activation.
     virtual void activate();
-    //virtual void initializeTrees();
+    virtual void initializeTrees();
     bool isImmobilized() const;
-
+    bool isImmo;
+    bool isIdle;
     std::vector<int> childLabels() ;
     bool hasNbrWithFollowDir2Unset();
 
@@ -550,6 +551,7 @@ public:
 
     ImmobilizedParticleSystem(int numParticles = 200, int numImmoParticles = 200, int genExpExample = 0, int numCoinFlips = 20);
     void printAllParticleStates() const;
+    void updateParticleStates();
     void setParticlesToImmobilized();
     const std::vector<AmoebotParticle*>& getParticles() const {
         return particles;
@@ -561,6 +563,7 @@ public:
     // Checks whether or not the system's run of the ShapeFormation formation
     // algorithm has terminated (all particles finished).
     bool hasTerminated() const override;
+    bool hasCompletedActivateLeader() const;
 };
 
 
