@@ -56,7 +56,7 @@ public:
     virtual void initializeTrees();
     virtual void startLeaderElection();
     //virtual void changetoImmo();
-
+    bool isLeaf() const;
     bool isImmobilized() const;
     bool terminated;
     std::vector<int> childLabels() ;
