@@ -51,12 +51,68 @@ Immobilizedparticles::Immobilizedparticles(const Node head,
 void Immobilizedparticles::activate(){
     printf("Activating particle. Current state: %d\n", state);
     auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
+
     if (immobilizedSystem){
         immobilizedSystem->updateParticleStates();
     }
+        processactivateHex();
 
+
+    for (const auto& particle : immobilizedSystem->getParticles()) {
+
+        auto* immobileParticle = dynamic_cast<const Immobilizedparticles*>(particle);
+        if (immobileParticle && immobilizedSystem->areAllParticlesInTargetStates()) {
+            if (leaderToken) {
+                printf("Particle has received the leader token.\n");
+                tryToBecomeLeader();
+                return;
+            }
+            else if (isInState({State::Leader})) {
+                if (moveDir == -1) {
+                    moveDir = randDir();
+                }
+                if (!areAllClusterAndIdleParticlesFollowers()) {
+                    printf("Waiting for all Cluster and Idle particles to become Followers.\n");
+
+                } else {
+
+                    if (isContracted() && !canExpand(dirToHeadLabel(moveDir))) {
+                        bool changed = false;
+                        for (int label : randLabels()) {
+                            moveDir = labelToDir(label);
+                            if (!hasNbrAtLabel(label) && !hasObjectAtLabel(label)) {
+                                if (isExpanded()) {
+                                    makeHeadLabel(label);
+                                }
+                                changed = true;
+                                break;
+                            }
+                        }
+
+                        if (!changed) {
+                            int label = labelOfFirstNbrInState({State::Follower});
+                            if (label >= 0) {
+                                passLeaderToken(label);
+                                moveDir = -1;
+                            } else {
+                                // This can only happen if the Leader is the only particle and it is
+                                // surrounded by objects.
+                                // So basically never, unless you are testing weird edge cases.
+                            }
+                        }
+                    }
+                }
+            }
+            if (!isInState({State::Idle, State::Immo, State::Marker, State::Root, State::Retired, State::Seed, State::FollowerHex})) {
+                performMovement();
+            }
+            updateBoolStates();
+            //updateBorderColors();
+
+        }
+    }
     if (state != State::Leader && state != State::Immo &&
-        phase != Phase::LeaderElection && phase != Phase::InitializeTrees) {
+        phase != Phase::LeaderElection && phase != Phase::InitializeTrees && phase != Phase::LeaderMovement) {
 
         for (auto& childLabel : uniqueLabels()) {
             if (hasNbrAtLabel(childLabel)) {
@@ -70,8 +126,8 @@ void Immobilizedparticles::activate(){
                 if (pointsAtMe(child, child.dirToHeadLabel(child.followDir2))) {
 
                     child.state = state;
-                    //child.followDir1 = childLabel;
-                    //child.followDir2 = childLabel;
+                    child.followDir1 = childLabel;
+                    child.followDir2 = childLabel;
 
                }
             }
@@ -84,50 +140,12 @@ void Immobilizedparticles::activate(){
     case Phase::InitializeTrees:
         immobilizedSystem->updateParticleStates();
         initializeTrees();
-
         break;
     case Phase::MoveToTargetTree:
-        updateBorderPointColors();
-        if (isInState({State::Idle})) {
-            for (int label : uniqueLabels()) {
-                if (hasNbrAtLabel(label)) {
-                    auto& nbr = nbrAtLabel(label);
-                    printf("Follow dir: Neighbour:: %d\n", nbr.followDir1);
-                    if ((nbr.isInState({State::Follower})  && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir2))) || (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
-                        followDir1 = label;
-                        state = State::Follower;
-                        return;
-                    }
-                    else{
-                        state= State::Marker;
-
-                    }
-                }
-            }}
-        if(isInState({State::Marker})){
-            for (int label : uniqueLabels()) {
-                if (hasNbrAtLabel(label)) {
-                    auto& nbr = nbrAtLabel(label);
-                    printf("Follow dir: Neighbour:: %d\n", nbr.followDir1);
-                    if ((nbr.isInState({State::Follower}))  || (nbr.isInState({State::Leader}))) {
-                        followDir1 = label;
-                        followDir2 = label;
-                        state = State::Follower;
-                        return;
-                    }
-                }
-            }
-        }
-        updateBorderPointColors();
-       performMovement2();
-
-        printf("Phase: MoveToTargetTree\n");
-
-        //phase = Phase::CheckTargetTree;
+        handleMoveToTargetTree();
         break;
-    case Phase::Leadermovement:
+    case Phase::LeaderMovement:
         printf("Phase: Leadermovement\n");
-        performMovement();
         //phase = Phase::HexagonFormation;
         break;
     case Phase::HexagonFormation:
@@ -140,12 +158,59 @@ void Immobilizedparticles::activate(){
         break;
     }
 }
+bool ImmobilizedParticleSystem::areAllParticlesInTargetStates() const {
+    for (const auto& p : particles) {
+        auto* immobileParticle = dynamic_cast<const Immobilizedparticles*>(p);
+        if (immobileParticle && !immobileParticle->isInState({Immobilizedparticles::State::Immo, Immobilizedparticles::State::Leader, Immobilizedparticles::State::Follower})) {
+            return false;
+        }
+    }
+    return true;
+}
+void Immobilizedparticles::handleMoveToTargetTree() {
+    if (isInState({State::Idle})) {
+        for (int label : uniqueLabels()) {
+            if (hasNbrAtLabel(label)) {
+                auto& nbr = nbrAtLabel(label);
+                if ((nbr.isInState({State::Follower}) && !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir2))) ||
+                    (nbr.isInState({State::Leader}) && (nbr.moveDir < 0 || !pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.moveDir))))) {
+                    followDir1 = label;
+                    followDir2 = label;
+                    state = State::Follower;
+                    break;
+                } else {
+                    state = State::Marker;
+                }
+            }
+        }
+    }
+
+    if (isInState({State::Marker})) {
+        for (int label : uniqueLabels()) {
+            if (hasNbrAtLabel(label)) {
+                auto& nbr = nbrAtLabel(label);
+                printf("Follow dir: Neighbour:: %d\n", nbr.followDir1);
+                if ((nbr.isInState({State::Follower})) || (nbr.isInState({State::Leader}))) {
+                    followDir1 = label;
+                    followDir2 = label;
+                    state = State::Follower;
+                    return;
+                }
+            }
+        }
+    }
+
+    updateBorderPointColors();
+    performMovement2();
+
+
+    printf("Phase: MoveToTargetTree\n");
+}
+
 
 void Immobilizedparticles::performMovement2() {
-    if (state != State::Marker) {
-        printf("Not in Marker state. Skipping movement.\n");
-        return;
-    }
+
+    if (state == State::Marker) {
 
     State originalState = state;
     Node originalHead = head;
@@ -193,11 +258,19 @@ void Immobilizedparticles::performMovement2() {
                         connected = true;
                         state = State::Follower;
                         followDir1 = labelToDir(elem2);
-                        printf("Still connected to leader/follower.\n");
+                        followDir2 = labelToDir(elem2);
                         break;
                     }
+                    else if (nbr.isInState({State::Marker})){
+                        connected = false;
+                        break;
+                    }
+                        else if(nbr.isInState({State::Immo})){
+                        connected = true;
+                        break;                    }
+                    }
                 }
-            }
+
 
             if (connected) {
                 contractTail();
@@ -220,6 +293,11 @@ void Immobilizedparticles::performMovement2() {
     }
 
     printf("Performed movement 2.\n");
+    }
+
+
+
+
 }
 
 
@@ -234,7 +312,19 @@ bool Immobilizedparticles::isLeaf() const {
     }
     return true;
 }
+bool ImmobilizedParticleSystem::updateParticleStates2() {
+    for (const auto& p : particles) {
+        auto* immobileParticle = dynamic_cast<const Immobilizedparticles*>(p);
+        if (immobileParticle && !(immobileParticle->isInState({Immobilizedparticles::State::Leader}) ||
+                                  immobileParticle->isInState({Immobilizedparticles::State::Follower}) ||
+                                  immobileParticle->isInState({Immobilizedparticles::State::Immo}))) {
+            return false;
+        }
+    }
 
+    return true;
+
+}
 
 void ImmobilizedParticleSystem::updateParticleStates() {
     for (auto& p : particles) {
@@ -318,6 +408,30 @@ void ImmobilizedParticleSystem::updateParticleStates() {
         printf("Not all particles have valid followDir2 values.\n");
     }
     //}
+
+
+
+    // // First pass: Check if any particle is in Marker state during MoveToTargetTree phase
+    // for (auto& p : particles) {
+    //     auto* immobileParticle = dynamic_cast<Immobilizedparticles*>(p);
+    //     if (immobileParticle && immobileParticle->phase == Immobilizedparticles::Phase::MoveToTargetTree) {
+    //         if (immobileParticle->state == Immobilizedparticles::State::Marker) {
+    //             markerExists = true;
+    //             break;
+    //         }
+    //     }
+    // }
+
+    // // Second pass: If no Marker state found, update phase to LeaderMovement
+    // if (!markerExists) {
+    //     for (auto& p : particles) {
+    //         auto* immobileParticle = dynamic_cast<Immobilizedparticles*>(p);
+    //         if (immobileParticle && immobileParticle->phase == Immobilizedparticles::Phase::MoveToTargetTree) {
+    //             immobileParticle->phase = Immobilizedparticles::Phase::Leadermovement;
+    //             printf("Updated particle phase to LeaderMovement.\n");
+    //         }
+    //     }
+    // }
 
 }
 
@@ -543,13 +657,14 @@ void Immobilizedparticles::performMovement() {
         if (isExpanded() && isInState({State::Follower, State::Leader}) && !hasBlockingTailNbr()) {
             printf("Contracting tail.\n");
             contractTail();
-        } else if (isContracted() && isInState({State::Follower}) && hasTailAtLabel(dirToHeadLabel(followDir))) {
-            printf("Expanding towards follow direction: %d\n", followDir);
-            int followLabel = dirToHeadLabel(followDir);
+        } else if (isContracted() && isInState({State::Follower}) && hasTailAtLabel(dirToHeadLabel(followDir1))) {
+            printf("Expanding towards follow direction: %d\n", followDir1);
+            int followLabel = dirToHeadLabel(followDir1);
             auto& nbr = nbrAtLabel(followLabel);
             int nbrContractionDir = nbrDirToDir(nbr, (nbr.tailDir() + 3) % 6);
             push(followLabel);
-            followDir = nbrContractionDir;
+            followDir1 = nbrContractionDir;
+            followDir2 = nbrContractionDir;
         } else if (isInState({State::Leader}) && isContracted() && !(freeState && lineState) && canExpand(dirToHeadLabel(moveDir))) {
             printf("Expanding towards move direction: %d\n", moveDir);
             expand(dirToHeadLabel(moveDir));
@@ -587,7 +702,7 @@ bool Immobilizedparticles::hasBlockingTailNbr() const {
         if (hasNbrAtLabel(label)) {
             auto& nbr = nbrAtLabel(label);
             if (nbr.isInState({State::Idle})
-                || (nbr.isInState({State::Follower}) && pointsAtMyTail(nbr, nbr.dirToHeadLabel(nbr.followDir)))) {
+                || (nbr.isInState({State::Follower}) && pointsAtMyTail(nbr, nbr.dirToHeadLabel(nbr.followDir1%6)))) {
                 return true;
             }
         }
@@ -612,7 +727,7 @@ void Immobilizedparticles::updateBoolStates() {
     for (int label : uniqueLabels()) {
         if (hasNbrAtLabel(label)) {
             auto& nbr = nbrAtLabel(label);
-            if (nbr.isInState({State::Follower}) && pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir2))) {
+            if (nbr.isInState({State::Follower}) && pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir1%6))) {
                 freeState = freeState && nbr.freeState;
                 printf("Neighbor is a follower. Free state updated to %d.\n", freeState);
             }
@@ -633,14 +748,14 @@ void Immobilizedparticles::updateBoolStates() {
     // (unless it is the Leader) and all its children's lineState is true.
     if (isInState({State::Follower})) {
         int parentDir = -1;
-        auto& nbr = nbrAtLabel(dirToHeadLabel(followDir2));
+        auto& nbr = nbrAtLabel(dirToHeadLabel(followDir1%6));
         if (nbr.isInState({State::Leader}) && nbr.moveDir >= 0) {
             parentDir = nbrDirToDir(nbr, nbr.moveDir);
         } else if (nbr.isInState({State::Follower})) {
-            parentDir = nbrDirToDir(nbr, nbr.followDir2);
+            parentDir = nbrDirToDir(nbr, nbr.followDir1%6);
         }
 
-        if (parentDir < 0 || parentDir != followDir2) {
+        if (parentDir < 0 || parentDir != followDir1) {
             lineState = false;
             printf("Parent direction does not match follow direction. Line state is false.\n");
             return;
@@ -651,7 +766,7 @@ void Immobilizedparticles::updateBoolStates() {
     for (int label : uniqueLabels()) {
         if (hasNbrAtLabel(label)) {
             auto& nbr = nbrAtLabel(label);
-            if (nbr.isInState({State::Follower}) && pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir2))) {
+            if (nbr.isInState({State::Follower}) && pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir1%6))) {
                 lineState = lineState && nbr.lineState;
                 printf("Neighbor is a follower. Line state updated to %d.\n", lineState);
             }
@@ -871,6 +986,35 @@ bool ImmobilizedParticleSystem::hasTerminated() const {
         return true;
     }
 #endif
+    bool leaderExists = false;
+    for (auto p : particles) {
+        auto hp = dynamic_cast<Immobilizedparticles*>(p);
+        if (hp->isInState({Immobilizedparticles::State::Idle}) || hp->isInState({Immobilizedparticles::State::Marker}) || !hp->freeState || !hp->lineState || hp->isExpanded()) {
+            return false;
+        }
+        if(hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})){
+
+            if (hp->isInState({Immobilizedparticles::State::Leader})) {
+                leaderExists = true;
+
+            }
+            //hp->activateHex();
+        }
+
+
+    }
+
+    if (leaderExists) {
+        for (auto p : particles) {
+            auto hp = dynamic_cast<Immobilizedparticles*>(p);
+            if (hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})) {
+               // hp->activateHex();
+            }
+        }
+    }
+
+    return leaderExists;
+}
 
     //     for (auto p : particles) {
     //         auto hp = dynamic_cast<Immobilizedparticles*>(p);
@@ -919,7 +1063,7 @@ bool ImmobilizedParticleSystem::hasTerminated() const {
 
     // // Return true if all particles are initialized and have valid followDir2 values
     // return   allParticlesHaveValidFollowDir2;
-}
+//}
 
 
 //Particle Apperance
@@ -1012,8 +1156,11 @@ int Immobilizedparticles::headMarkDir() const {
         return followDir2;
     }
     else if(isInState({State::Immo})){
-        return followDir2;
-    }
+        return followDir2;}
+        else if (state == State::Leader) {
+                return moveDir;
+            }
+
     else{
         return followDir2;
     }
@@ -1128,7 +1275,7 @@ void Immobilizedparticles::activateHex() {
                 return;
             } else if (hasNbrInState({State::Lead, State::FollowerHex})) {
                 state = State::FollowerHex;
-                followDir = labelOfFirstNbrInState({State::Lead, State::FollowerHex});
+                followDir1 = labelOfFirstNbrInState({State::Lead, State::FollowerHex});
                 return;
             }
         } else if (state == State::FollowerHex) {
@@ -1136,11 +1283,11 @@ void Immobilizedparticles::activateHex() {
                 state = State::Lead;
                 updateMoveDir();
                 return;
-            } else if(hasTailAtLabel(followDir)) {
-                auto nbr = nbrAtLabel(followDir);
+            } else if(hasTailAtLabel(followDir1%6)) {
+                auto nbr = nbrAtLabel(followDir1%6);
                 int nbrContractionDir = nbrDirToDir(nbr, (nbr.tailDir() + 3) % 6);
-                push(followDir);
-                followDir = nbrContractionDir;
+                push(followDir1%6);
+                followDir1 = nbrContractionDir;
                 return;
             }
         } else if (state == State::Lead) {
@@ -1166,7 +1313,7 @@ void Immobilizedparticles::activateHex() {
 bool Immobilizedparticles::hasTailFollower() const {
     auto prop = [&](const Immobilizedparticles& p) {
         return p.state == State::FollowerHex &&
-               pointsAtMyTail(p, p.dirToHeadLabel(p.followDir));
+               pointsAtMyTail(p, p.dirToHeadLabel(p.followDir1%6));
     };
     return labelOfFirstNbrWithProperty<Immobilizedparticles>(prop) != -1;
 }

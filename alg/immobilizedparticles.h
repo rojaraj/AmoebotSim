@@ -40,7 +40,7 @@ public:
         InitializeTrees,
         MoveToTargetTree,
         CheckTargetTree,
-        Leadermovement,
+        LeaderMovement,
         HexagonFormation
     };
 
@@ -55,6 +55,7 @@ public:
     virtual void activate();
     virtual void initializeTrees();
     virtual void startLeaderElection();
+    virtual void handleMoveToTargetTree();
     //virtual void changetoImmo();
     bool isLeaf() const;
     bool isImmobilized() const;
@@ -547,13 +548,14 @@ public:
     }
 
     void updateParticleStates();
+    bool updateParticleStates2();
     bool hasCompletedActivateLeader() const;
     void updateBorderPointColors();
     void updateAllBorderPointColors();
     // Checks whether or not the system's run of the ShapeFormation formation
     // algorithm has terminated (all particles finished).
     bool hasLeader () const;
-
+    bool areAllParticlesInTargetStates() const;
     bool hasTerminated() const override;
 };
 
