@@ -56,6 +56,8 @@ public:
     virtual void initializeTrees();
     virtual void startLeaderElection();
     virtual void handleMoveToTargetTree();
+    virtual void processParticlesWithLeaderToken();
+
     //virtual void changetoImmo();
     bool isLeaf() const;
     bool isImmobilized() const;
@@ -550,6 +552,7 @@ public:
     void updateParticleStates();
     bool updateParticleStates2();
     bool hasCompletedActivateLeader() const;
+    bool hasCompletedMoveToTargetTree() const;
     void updateBorderPointColors();
     void updateAllBorderPointColors();
     // Checks whether or not the system's run of the ShapeFormation formation
