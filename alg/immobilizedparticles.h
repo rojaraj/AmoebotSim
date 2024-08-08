@@ -555,6 +555,7 @@ public:
     bool hasCompletedMoveToTargetTree() const;
     void updateBorderPointColors();
     void updateAllBorderPointColors();
+    bool checkAndSwitchToHexagonFormationPhase();
     // Checks whether or not the system's run of the ShapeFormation formation
     // algorithm has terminated (all particles finished).
     bool hasLeader () const;

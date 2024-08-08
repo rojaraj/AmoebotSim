@@ -60,7 +60,7 @@ void Immobilizedparticles::activate(){
 
 
     if (state != State::Leader && state != State::Immo && state != State::Root&& state != State::Retired&& state != State::Seed&& state != State::FollowerHex &&
-        phase != Phase::LeaderElection && phase != Phase::InitializeTrees && phase != Phase::LeaderMovement) {
+        phase != Phase::LeaderElection && phase != Phase::InitializeTrees && phase != Phase::LeaderMovement && phase != Phase::HexagonFormation) {
 
         for (auto& childLabel : uniqueLabels()) {
             if (hasNbrAtLabel(childLabel)) {
@@ -94,7 +94,13 @@ void Immobilizedparticles::activate(){
         break;
     case Phase::LeaderMovement:
         printf("Phase: Leadermovement\n");
+        updateBorderPointColors();
         processParticlesWithLeaderToken();
+        if(immobilizedSystem->checkAndSwitchToHexagonFormationPhase()){
+            phase = Phase::HexagonFormation;
+             printf("Transitioning to HexagonFormation phase.\n");
+
+        }
         //phase = Phase::HexagonFormation;
 
         break;
@@ -317,9 +323,11 @@ void Immobilizedparticles::performMovement2() {
 
 
             if (connected) {
+                    if (isExpanded()){
                 contractTail();
                 printf("Expansion successful. Contracting tail.\n");
                 break;
+                    }
             } else {
                 printf("Expansion to label: %d would disconnect, backtracking.\n", elem);
                 if (isExpanded()) {
@@ -1030,34 +1038,81 @@ bool ImmobilizedParticleSystem::hasTerminated() const {
         return true;
     }
 #endif
+    // bool leaderExists = false;
+    // for (auto p : particles) {
+    //     auto hp = dynamic_cast<Immobilizedparticles*>(p);
+    //     if (hp->isInState({Immobilizedparticles::State::Idle}) || hp->isInState({Immobilizedparticles::State::Marker}) || !hp->freeState || !hp->lineState || hp->isExpanded()) {
+    //         return false;
+    //     }
+    //     if(hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})){
+
+    //         if (hp->isInState({Immobilizedparticles::State::Leader})) {
+    //             leaderExists = true;
+
+    //         }
+    //         //hp->activateHex();
+    //     }
+
+
+    // }
+
+    // if (leaderExists) {
+    //     for (auto p : particles) {
+    //         auto hp = dynamic_cast<Immobilizedparticles*>(p);
+    //         if (hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})) {
+    //            //hp->activateHex();
+    //         }
+    //     }
+    // }
+
+    // return leaderExists;
+}
+bool ImmobilizedParticleSystem::checkAndSwitchToHexagonFormationPhase() {
     bool leaderExists = false;
+
+    // First pass: Check if all particles are in the appropriate states and conditions are met
     for (auto p : particles) {
         auto hp = dynamic_cast<Immobilizedparticles*>(p);
-        if (hp->isInState({Immobilizedparticles::State::Idle}) || hp->isInState({Immobilizedparticles::State::Marker}) || !hp->freeState || !hp->lineState || hp->isExpanded()) {
+        if (!hp) continue;
+
+        // Check if the particle is in an inappropriate state or condition
+        if (hp->isInState({Immobilizedparticles::State::Idle}) ||
+            hp->isInState({Immobilizedparticles::State::Marker}) ||
+            !hp->freeState || !hp->lineState || hp->isExpanded()) {
             return false;
         }
-        if(hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})){
 
+        // Check if there is a Leader or Follower particle
+        if (hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})) {
             if (hp->isInState({Immobilizedparticles::State::Leader})) {
                 leaderExists = true;
-
             }
-            //hp->activateHex();
         }
-
-
     }
 
+    // Second pass: If a leader exists and all conditions are met, update phase and switch to HexagonFormation phase
     if (leaderExists) {
         for (auto p : particles) {
             auto hp = dynamic_cast<Immobilizedparticles*>(p);
+            if (!hp) continue;
+
             if (hp->isInState({Immobilizedparticles::State::Leader}) || hp->isInState({Immobilizedparticles::State::Follower})) {
-               // hp->activateHex();
+                // Update the phase of each particle to HexagonFormation
+                hp->phase = Immobilizedparticles::Phase::HexagonFormation;
+                printf("Updated particle phase to HexagonFormation.\n");
+
+                // Optional: Activate hexagon formation related functionality
+                // hp->activateHex();
             }
         }
+
+        // Switch the system phase to HexagonFormation
+        //hp->phase = Immobilizedparticles::Phase::HexagonFormation;
+        printf("Switched system phase to HexagonFormation.\n");
+        return true;
     }
 
-    return leaderExists;
+    return false;
 }
 
     //     for (auto p : particles) {
@@ -1280,6 +1335,12 @@ const std::vector<int> Immobilizedparticles::conTailChildLabels() const {
 void Immobilizedparticles::processactivateHex(){
     if(isInState({State::FollowerHex,State::Lead,State::Seed, State::Finish})){
         activateHex();
+    }
+    if(isInState({State::Leader})){
+        state = State::Seed;
+    }
+    if(isInState({State::Follower})){
+        state = State::FollowerHex;
     }
 }
 
