@@ -1038,6 +1038,17 @@ bool ImmobilizedParticleSystem::hasTerminated() const {
         return true;
     }
 #endif
+    for (auto p : particles) {
+        auto hp = dynamic_cast<Immobilizedparticles*>(p);
+        if (hp && hp->state != Immobilizedparticles::State::Seed &&
+            hp->state != Immobilizedparticles::State::Finish &&
+            hp->state != Immobilizedparticles::State::Immo) {
+            return false;
+        }
+    }
+
+    printf("Termination condition met: All particles are in Seed, Retired, or Immo states.\n");
+    return true;
     // bool leaderExists = false;
     // for (auto p : particles) {
     //     auto hp = dynamic_cast<Immobilizedparticles*>(p);
