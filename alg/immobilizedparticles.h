@@ -1,10 +1,6 @@
 // //immo_shape working .h file
-
-
 // //LeaderElectionParticle is changed to ImmoLeaderElectionParticle
 // //LeaderElectionAgent is changed to ImmoLeaderElectionAgent
-
-
 #ifndef Immobilizedparticles_H
 #define Immobilizedparticles_H
 #include <set>
@@ -15,7 +11,6 @@
 #include "core/amoebotsystem.h"
 #include <QOpenGLFunctions_2_0>
 class Immobilizedparticles : public AmoebotParticle {
-
 public:
     enum class State {
         Immo,       // for immo particle
@@ -24,6 +19,7 @@ public:
         Follower,
         FollowerHex,        // Member of the spanning forest but not on the forming hexagon.
         Marker,
+        MergedMarker,
         Seed,
         Single,
         Retired,
@@ -43,24 +39,33 @@ public:
         LeaderMovement,
         HexagonFormation
     };
-
     Phase phase;
     // Constructs a new particle with a node position for its head, a global
     // compass direction from its head to its tail (-1 if contracted), an offset
     // for its local compass, a system which it belongs to and an initial state.
     Immobilizedparticles(const Node head, const int globalTailDir, const int orientation,
                          AmoebotSystem& system, State state);
-
     // Executes one particle activation.
     virtual void activate();
     virtual void initializeTrees();
     virtual void startLeaderElection();
     virtual void handleMoveToTargetTree();
     virtual void processParticlesWithLeaderToken();
-
     //virtual void changetoImmo();
     bool isLeaf() const;
     bool isImmobilized() const;
+
+    void updateTargetTree();
+
+    int getLineChildParticleLabel() const;
+
+
+    bool hasChildParticle() const;
+
+    void mergeWithMarker(Node& nbr);
+    bool hasIdleParticles;
+    bool shouldMoveToInitializeTrees;
+    void broadCast();
     bool terminated;
     std::vector<int> childLabels() ;
     bool hasNbrWithFollowDir2Unset();
@@ -78,42 +83,29 @@ public:
     virtual void activateLeader();
     virtual void tryToBecomeLeader();
     virtual void activateHex();
-
-    int nextClockwiseDir(int inputDir);
-    int nextCounterclockwiseDir(int inputDir);
-
+    virtual int nextClockwiseDir(int inputDir);
+    virtual int nextCounterclockwiseDir(int inputDir);
     int constructionReceiveDir() const;
-
     // Checks whether this particle is occupying the next position to be filled.
     bool canFinish() const;
-
     // Sets this particle's constructionDir to point at the next position to be
     // filled as it is finishing.
     void updateConstructionDir();
-
     // Updates this particle's moveDir when it is a leader to traverse the current
     // surface of the forming shape counter-clockwise.
     void updateMoveDir();
-
     // Checks whether this particle has an immediate child in the spanning tree
     // following its tail.
     bool hasTailFollower() const;
-
     virtual void passLeaderToken(const int label);
     virtual void performMovement();
-
     //virtual void connectCluster();
-
     bool areAllClusterAndIdleParticlesFollowers();
     virtual void performMovement2();
     virtual void updateBoolStates();
-
     //virtual void updateMoveDir();
-
     virtual std::vector<int> randLabels();
-
     virtual bool hasBlockingTailNbr() const;
-
     // Functions for altering a particle's cosmetic appearance.
     // particleColor returns the color to be used for the particle.
     // headMarkColor (respectively, tailMarkColor) returns the color to be used for the ring
@@ -124,11 +116,9 @@ public:
     virtual int headMarkColor() const;
     virtual int headMarkDir() const;
     virtual int tailMarkColor() const;
-
     // Returns the string to be displayed when this particle is inspected; used
     // to snapshot the current values of this particle's memory at runtime.
     virtual QString inspectionText() const;
-
     // Returns the _borderColors array associated with the
     // particle to draw the boundaries of the line.
     virtual std::array<int, 18> borderColors() const;
@@ -136,110 +126,84 @@ public:
     // particle to draw the directions of the token.
     virtual std::array<int, 6> borderPointColors() const;
     // Updates the _borderColors and the _borderPointColors arrays.
-
     virtual std::array<int, 18> leaderborderColorLabels() const;
     virtual std::array<int, 6> leaderborderPointColorLabels() const;
-
     void updateBorderColors();
     void updateBorderPointColors();
     //void updateAllBorderPointColors();
-
     // Gets a reference to the neighboring particle incident to the specified port
     // label. Crashes if no such particle exists at this label; consider using
     // hasNbrAtLabel() first if unsure.
     Immobilizedparticles& nbrAtLabel(int label) const;
     //virtual int labelOfFirstNbrInState(std::initializer_list<State> states, int startLabel, bool ignoreErrorParticles) const;
-
     // Returns the label of the first port incident to a neighboring particle in
     // any of the specified states, starting at the (optionally) specified label
     // and continuing clockwise.
     // int labelOfFirstNbrInState(std::initializer_list<State> states, int startLabel = 0, bool ignoreImmobParticles = true) const;
-
     virtual int labelOfFirstNbrInState(std::initializer_list<State> states, int startLabel = 0, bool ignoreImmobParticles = true) const;
-
     // Checks whether this particle has a neighbor in any of the given states.
     bool hasNbrInState(std::initializer_list<State> states) const;
     int nextHexagonDir(int orientation) const;
     bool canRetire() const;
     bool hasTailChild() const;
     const std::vector<int>  conTailChildLabels() const;
-
     //     // int constructionReceiveDir() const;
-
     //     //bool doesEnclosureOccur(std::set<Node>& occupied, Node testNode);
-
     // Checks whether this particle's state is one of the given states.
     bool isInState(std::initializer_list<State> states) const;
     void setState(State newState);
-
     //for parent-childtree
     // void setParent(Immobilizedparticles* parent) {
     //     this->parent = parent;
     // }
-
     // void addChild(Immobilizedparticles* child) {
     //     this->children.push_back(child);
     // }
-
     //void updateConstructionDir();
     // bool canFinish() const;
     // bool hasTailFollower() const;
-
     // Returns the label associated with the direction which the next (resp.
     // previous) agent is according to the cycle that the agent is on (which is
     // determined by the provided agentDir parameter).
     int getNextAgentDir(const int agentDir) const;
     int getPrevAgentDir(const int agentDir) const;
-
     // Returns a count of the number of particle neighbors surrounding the calling
     // particle.
     int getNumberOfNbrs() const;
-
 protected:
-
     // General state of this particle.
     State state;
     int _parentDir;   // Corresponds to "parent" in paper.
     int _hexagonDir;
     QOpenGLFunctions_2_0* glfn;
     // Line recovery specific variables of this particle:
-
     // Movement direction markers for the Leader and Followers.
     int moveDir;
+    int label;
     int followDir;
     int followDir1;
     int followDir2;
     int constructionDir;
-
     // Token to be passed around when a new Leader is required.
     bool leaderToken;
-
     // Arbitrarily chosen 'goal' direction of the leader token. Like in the Pledge algorithm,
     // this is the token's ultimate destination direction.
     int tokenForwardDir;
-
     // Current direction that the token is pointing towards. If this direction marker does
     // not match the tokenForwardDir, the token's particle moves along the object closest to
     // the right of tokenCurrentDir.
     int tokenCurrentDir;
-
     // Ignore objects around the particle and pass the leader token forwards unless there
     // is no space.
     bool passForward;
-
     // Bool that marks whether a particle and all its children are 'free' from the objects.
     bool freeState;
-
     // Bool that marks whether a particle and all its children form a line.
     bool lineState;
-
     // _borderColorsSet and _borderColors are used to draw the boundaries of the hexagon layers.
     bool _borderColorsSet;
-
     // std::array<int, 18> _borderColors;
     // std::array<int, 6> _borderPointColors;
-
-
     // The LeaderElectionToken struct provides a general framework of any token
     // under the General Leader Election algorithm.
     struct LeaderElectionToken : public Token {
@@ -247,7 +211,6 @@ protected:
         // was received from.
         int origin;
     };
-
     // Tokens for Candidate Elimination via Segment Comparison
     struct SegmentLeadToken : public LeaderElectionToken {
         SegmentLeadToken(int origin = -1) {
@@ -285,7 +248,6 @@ protected:
             this->hasCoveredCandidate = hasCovered;
         }
     };
-
     // Tokens for Coin Flipping and Candidate Transferal
     struct CandidacyAnnounceToken : public LeaderElectionToken {
         CandidacyAnnounceToken(int origin = -1) {
@@ -297,7 +259,6 @@ protected:
             this->origin = origin;
         }
     };
-
     // Tokens for Solitude Verification
     struct SolitudeActiveToken : public LeaderElectionToken {
         bool isSoleCandidate;
@@ -316,7 +277,6 @@ protected:
     struct SolitudeVectorToken : public LeaderElectionToken {
         bool isSettled;
     };
-
     struct SolitudePositiveXToken : public SolitudeVectorToken {
         SolitudePositiveXToken(int origin = -1, bool settled = false) {
             this->origin = origin;
@@ -341,7 +301,6 @@ protected:
             this->isSettled = settled;
         }
     };
-
     // Token for Border Testing
     struct BorderTestToken : public LeaderElectionToken {
         int borderSum;
@@ -350,8 +309,12 @@ protected:
             this->borderSum = borderSum;
         }
     };
-
 private:
+
+
+
+
+
     friend class ImmobilizedParticleSystem;
     // The nested class LeaderElectionAgent is used to define the behavior for the
     // agents as described in the paper.
@@ -363,9 +326,7 @@ private:
             CoinFlipping,
             SolitudeVerification
         };
-
         ImmoLeaderElectionAgent();
-
         // General variables in agent memory:
         // The particle emulating this agent assigns it a localId in [1,3] to
         // distinguish it from the other agents it may be emulating. From the
@@ -380,11 +341,9 @@ private:
         int localId;
         int agentDir, nextAgentDir, prevAgentDir;
         int passTokensDir = -1;
-
         State agentState;
         SubPhase subPhase;
         Immobilizedparticles* candidateParticle;
-
         // Variables for Segment Comparison:
         // comparingSegment is true if this agent is in the Segment Comparison
         // subphase and has generated and passed a segment lead token along its
@@ -405,7 +364,6 @@ private:
         bool isCoveredCandidate = false;
         bool absorbedActiveToken = false;
         bool generatedCleanToken = false;
-
         // Variables for Coin Flipping and Candidacy Transferal:
         // gotAnnounceInCompare is set to true if this agent did not succeed in
         // covering another candidate in its Segment Comparison subphase but was
@@ -421,7 +379,6 @@ private:
         bool gotAnnounceInCompare = false;
         bool gotAnnounceBeforeAck = false;
         bool waitingForTransferAck = false;
-
         // Variables for Solitude Verification:
         // createdLead is true if this agent generated a solitude active token and
         // passed it forward during Solitude Verification.
@@ -430,23 +387,19 @@ private:
         // tokens of different agents on the same particle in Solitude Verification.
         bool createdLead = false;
         bool hasGeneratedTokens = false;
-
         // Variables for Boundary Testing:
         // testingBorder is true if this agent is the sole candidate and has begun
         // the Boundary Testing subphase.
         bool testingBorder = false;
-
         // The activate function is the LeaderElectionAgent equivalent of an
         // Amoebot Particle's activate function
         void activate();
-
         // Methods for token cleaning if a candidate is covered.
         // The boolean parameter "first" is used to determine whether or not the
         // cleaning agent is a covered candidate which has just absorbed an active
         // token and must delete/clean its tokens for the first time.
         void activeClean(bool first);
         void passiveClean(bool first);
-
         // Solitude Verification Methods
         // augmentDirVector takes a <int, int> pair as a parameter, which represents
         // the current vector stored in the solitude active token. This function
@@ -455,12 +408,10 @@ private:
         // subphase generates the solitude active token) based on the vector stored
         // in the solitude active token.
         std::pair<int, int> augmentDirVector(std::pair<int, int> vector);
-
         // generateSolitudeVectorTokens generates the solitude vector tokens
         // (SolitudePositiveXToken, SolitudeNegativeXToken, etc.) based on the given
         // parameter vector.
         void generateSolitudeVectorTokens(std::pair<int, int> vector);
-
         // The checkSolitudeXTokens and checkSolitudeYTokens are used to determine
         // the condition of the solitude vector tokens that an agent might own.
         // The functions will return a value contained in [0,2] depending on what
@@ -473,15 +424,12 @@ private:
         // present on the current agent.
         int checkSolitudeXTokens() const;
         int checkSolitudeYTokens() const;
-
         // The cleanSolitudeVerificationTokens function will clean the solitude
         // vector tokens owned by a particular agent as well as paint the
         // front and back segments gray
         void cleanSolitudeVerificationTokens();
-
         // Boundary Testing methods
         int addNextBorder(int currentSum) const;
-
         // Methods for passing, taking, and checking the ownership of tokens at the
         // agent level
         template <class TokenType>
@@ -494,7 +442,6 @@ private:
         void passAgentToken(int agentDir, std::shared_ptr<TokenType> token);
         ImmoLeaderElectionAgent* nextAgent() const;
         ImmoLeaderElectionAgent* prevAgent() const;
-
         // Methods responsible for rendering the agents onto the simulator with
         // their colors changing based on the state and the subphase of the current
         // agent
@@ -505,7 +452,6 @@ private:
         // Green --> Sole candidate
         void setStateColor();
         void setSubPhaseColor();
-
         // Methods responsible for painting the borders which will act as physical
         // representations of the cycle for leader election
         // Red --> Segment Comparison Phase
@@ -522,26 +468,17 @@ private:
     // friend class LeaderElectionSystem;
     // Immobilizedparticles* parent;
     // std::vector<Immobilizedparticles*> children;
-
 protected:
-
     unsigned int currentAgent;
     std::vector<ImmoLeaderElectionAgent*> agents;
     std::array<int, 18> _leaderborderColorLabels;
     std::array<int, 6> _leaderborderPointColorLabels;
-
 };
-
-
-
 class ImmobilizedParticleSystem : public AmoebotSystem  {
-
 public:
     // Constructs a system of ShapeFormationFaultTolerantParticles with an optionally specified
     // size (#particles) and immobility rate, i.e. the probability for each particle to be
     // immobilized in the initial configuration. The particles initially form a line.
-
-
     ImmobilizedParticleSystem(int numParticles = 200, int numImmoParticles = 200, int genExpExample = 0, int numCoinFlips = 20);
     void printAllParticleStates() const;
     void setParticlesToImmobilized();
@@ -549,6 +486,9 @@ public:
         return particles;
     }
 
+
+
+    void statechange();
     void updateParticleStates();
     bool updateParticleStates2();
     bool hasCompletedActivateLeader() const;
@@ -562,5 +502,4 @@ public:
     bool areAllParticlesInTargetStates() const;
     bool hasTerminated() const override;
 };
-
 #endif // Immobilizedparticles_H
