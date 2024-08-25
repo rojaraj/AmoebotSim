@@ -53,13 +53,15 @@ public:
     virtual void processParticlesWithLeaderToken();
     //virtual void changetoImmo();
     bool isLeaf() const;
+    bool isParent() const;
+
     bool isImmobilized() const;
 
     void updateTargetTree();
 
     int getLineChildParticleLabel() const;
 
-
+    bool hasCompletedMoveToTargetTree() const;
     bool hasChildParticle() const;
 
     void mergeWithMarker(Node& nbr);
@@ -67,15 +69,24 @@ public:
     bool shouldMoveToInitializeTrees;
     void broadCast();
     bool terminated;
-    std::vector<int> childLabels() ;
+    std::vector<int> childLabels() const ;
     bool hasNbrWithFollowDir2Unset();
     //virtual void processactivateHex();
     bool tree2Ack;
     bool hasCompletedActivateLeader() const;
     bool isImmo;
     bool isIdle;
+
+    void particleStatechange();
+    void statecheck() const;
+    bool hasIdleParticleInLoop;
+    bool idleStateUpdated;
+    bool markerStateTransition;
+    bool hasMarkerParticles;
+    bool hasCompletedhandleMoveToTargetTree() const;
+    bool hasCompletedInitializeTrees() const;
     virtual void processactivateHex();
-    virtual void leaderElection();
+    //virtual void leaderElection();
     //NON-IMMO state change
     //void changeStateOfNonImmobilizedParticles();
     //Get neighbour labels
@@ -100,8 +111,18 @@ public:
     virtual void passLeaderToken(const int label);
     virtual void performMovement();
     //virtual void connectCluster();
-    bool areAllClusterAndIdleParticlesFollowers();
+    bool areAllMarkerAndIdleParticlesFollowers();
     virtual void performMovement2();
+    virtual int getLineChildParticleLabel();
+
+    // virtual void moveMarkerParticles();
+    // virtual void moveSingleMarkerParticle();
+
+
+    bool allDescendantsImmo() const;
+    bool safeToMove();
+    bool allIdleParticlesTransitioned();
+
     virtual void updateBoolStates();
     //virtual void updateMoveDir();
     virtual std::vector<int> randLabels();
@@ -183,6 +204,7 @@ protected:
     int followDir;
     int followDir1;
     int followDir2;
+    int followDir2reverse;
     int constructionDir;
     // Token to be passed around when a new Leader is required.
     bool leaderToken;
