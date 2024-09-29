@@ -48,37 +48,51 @@ public:
     // Executes one particle activation.
     virtual void activate();
     virtual void initializeTrees();
+    bool checkInitializeTreesRecursively(Immobilizedparticles* particle);
+    void updateParticlesStateRecursively(std::vector<Immobilizedparticles*>& particles);
     virtual void startLeaderElection();
     virtual void handleMoveToTargetTree();
     virtual void processParticlesWithLeaderToken();
     //virtual void changetoImmo();
     bool isLeaf() const;
     bool isParent() const;
-
+    void convergecast() const;
+    void broadcast()const;
     bool isImmobilized() const;
-
+    bool hasNeighborAtLabel(int label) const {
+        return hasNbrAtLabel(label); // Call the protected method
+    }
     void updateTargetTree();
-
+    bool hasCompletedInitializeTree() const;
+    //void checkAndTransitionToMoveToTargetTree();
     int getLineChildParticleLabel() const;
-
+    bool checkAndSwitchToHexagonFormationPhase();
     bool hasCompletedMoveToTargetTree() const;
     bool hasChildParticle() const;
-
+    bool allParticlesHaveValidFollowDir2()  const;
     void mergeWithMarker(Node& nbr);
     bool hasIdleParticles;
     bool shouldMoveToInitializeTrees;
     void broadCast();
     bool terminated;
     std::vector<int> childLabels() const ;
+    std::vector<int> childLabels2() const ;
     bool hasNbrWithFollowDir2Unset();
+    bool isBlockedByAncestors() const ;
     //virtual void processactivateHex();
     bool tree2Ack;
     bool hasCompletedActivateLeader() const;
     bool isImmo;
     bool isIdle;
+    void allIdleParticlesTransitioned() const ;
 
+
+
+    bool checkFollowDir2Recursively(const Immobilizedparticles& particle) const ;
+    //bool allParticlesHaveValidFollowDir2() const ;
     void particleStatechange();
     void statecheck() const;
+    void updateParticlePhases() const;
     bool hasIdleParticleInLoop;
     bool idleStateUpdated;
     bool markerStateTransition;
@@ -95,7 +109,7 @@ public:
     virtual void tryToBecomeLeader();
     virtual void activateHex();
     virtual int nextClockwiseDir(int inputDir);
-    virtual int nextCounterclockwiseDir(int inputDir);
+    virtual int nextCounterclockwiseDir(int inputDir) const;
     int constructionReceiveDir() const;
     // Checks whether this particle is occupying the next position to be filled.
     bool canFinish() const;
@@ -115,17 +129,24 @@ public:
     virtual void performMovement2();
     virtual int getLineChildParticleLabel();
 
+    bool isInLoopHelper(const Immobilizedparticles* root) const;
+    bool isInLoop() const ;
+
+
+
     // virtual void moveMarkerParticles();
     // virtual void moveSingleMarkerParticle();
 
-
+    bool hasMarkerDescendant() const ;
     bool allDescendantsImmo() const;
-    bool safeToMove();
+    bool safeToMove() const;
     bool allIdleParticlesTransitioned();
-
-    virtual void updateBoolStates();
+    //bool checkAndSwitchToHexagonFormationPhase() const;
+    virtual void moveAwayTargettree();
     //virtual void updateMoveDir();
     virtual std::vector<int> randLabels();
+    virtual std::vector<int> randLabelsHead();
+
     virtual bool hasBlockingTailNbr() const;
     // Functions for altering a particle's cosmetic appearance.
     // particleColor returns the color to be used for the particle.
@@ -172,7 +193,7 @@ public:
     //     //bool doesEnclosureOccur(std::set<Node>& occupied, Node testNode);
     // Checks whether this particle's state is one of the given states.
     bool isInState(std::initializer_list<State> states) const;
-    void setState(State newState);
+    //void setState(State newState);
     //for parent-childtree
     // void setParent(Immobilizedparticles* parent) {
     //     this->parent = parent;
@@ -191,6 +212,15 @@ public:
     // Returns a count of the number of particle neighbors surrounding the calling
     // particle.
     int getNumberOfNbrs() const;
+//etter for state
+    void setState(State newState) {
+        state = newState;
+    }
+
+    // Getter for state
+    State getState() const {
+        return state;
+    }
 protected:
     // General state of this particle.
     State state;
@@ -206,6 +236,10 @@ protected:
     int followDir2;
     int followDir2reverse;
     int constructionDir;
+
+    std::vector<Particle*> particles;
+
+
     // Token to be passed around when a new Leader is required.
     bool leaderToken;
     // Arbitrarily chosen 'goal' direction of the leader token. Like in the Pledge algorithm,
@@ -510,7 +544,7 @@ public:
 
 
 
-    void statechange();
+    void particleStatechange();
     void updateParticleStates();
     bool updateParticleStates2();
     bool hasCompletedActivateLeader() const;
