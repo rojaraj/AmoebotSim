@@ -1,235 +1,149 @@
-// //immo_shape working .h file
-// //LeaderElectionParticle is changed to ImmoLeaderElectionParticle
-// //LeaderElectionAgent is changed to ImmoLeaderElectionAgent
-#ifndef Immobilizedparticles_H
-#define Immobilizedparticles_H
-#include <set>
+#ifndef IMMOBILIZEDPARTICLES_H
+#define IMMOBILIZEDPARTICLES_H
+
 #include <QString>
 #include <array>
 #include <vector>
 #include "core/amoebotparticle.h"
 #include "core/amoebotsystem.h"
 #include <QOpenGLFunctions_2_0>
+
 class Immobilizedparticles : public AmoebotParticle {
 public:
+    // Enum representing the different states a particle can have
     enum class State {
-        Immo,       // for immo particle
+        Immo,           // Immobilized particle
         Leader,
-        Idle,       // initial state
+        Idle,           // Initial state
         Follower,
-        FollowerHex,        // Member of the spanning forest but not on the forming hexagon.
+        FollowerHex,    // Member of the spanning forest but not forming the hexagon
         Marker,
-        MergedMarker,
         Seed,
         Single,
         Retired,
         Finish,
         Lead,
-        Root,        // non-immobilized particle which is not a part of the spanning forest
-        Candidate, // for leader election
+        Root,           // Non-immobilized particle not part of the spanning forest
+        Candidate,      // For leader election
         SoleCandidate,
         Demoted,
         Finished
     };
+
+    // Enum representing the phases of the formation algorithm
     enum class Phase {
         LeaderElection,
         InitializeTrees,
-        MoveToTargetTree,
+        CompleteTargetTree,
         CheckTargetTree,
         LeaderMovement,
         HexagonFormation
     };
+
+
     Phase phase;
+
     // Constructs a new particle with a node position for its head, a global
     // compass direction from its head to its tail (-1 if contracted), an offset
-    // for its local compass, a system which it belongs to and an initial state.
+    // for its local compass, a system which it belongs to, and an initial state.
     Immobilizedparticles(const Node head, const int globalTailDir, const int orientation,
                          AmoebotSystem& system, State state);
+
     // Executes one particle activation.
     virtual void activate();
-    virtual void initializeTrees();
-    bool checkInitializeTreesRecursively(Immobilizedparticles* particle);
-    void updateParticlesStateRecursively(std::vector<Immobilizedparticles*>& particles);
     virtual void startLeaderElection();
-    virtual void handleMoveToTargetTree();
+    virtual void initializeTrees();
+    virtual void changeIdleState();
     virtual void processParticlesWithLeaderToken();
-    //virtual void changetoImmo();
-    bool isLeaf() const;
-    bool isParent() const;
-    void convergecast() const;
-    void broadcast()const;
-    bool isImmobilized() const;
-    bool hasNeighborAtLabel(int label) const {
-        return hasNbrAtLabel(label); // Call the protected method
-    }
-    void updateTargetTree();
-    bool hasCompletedInitializeTree() const;
-    //void checkAndTransitionToMoveToTargetTree();
-    int getLineChildParticleLabel() const;
-    bool checkAndSwitchToHexagonFormationPhase();
-    bool hasCompletedMoveToTargetTree() const;
-    bool hasChildParticle() const;
-    bool allParticlesHaveValidFollowDir2()  const;
-    void mergeWithMarker(Node& nbr);
-    bool hasIdleParticles;
-    bool shouldMoveToInitializeTrees;
-    void broadCast();
-    bool terminated;
-    std::vector<int> childLabels() const ;
-    std::vector<int> childLabels2() const ;
-    bool hasNbrWithFollowDir2Unset();
-    bool isBlockedByAncestors() const ;
-    //virtual void processactivateHex();
-    bool tree2Ack;
-    bool hasCompletedActivateLeader() const;
-    bool isImmo;
-    bool isIdle;
-    void allIdleParticlesTransitioned() const ;
-
-
-
-    bool checkFollowDir2Recursively(const Immobilizedparticles& particle) const ;
-    //bool allParticlesHaveValidFollowDir2() const ;
-    void particleStatechange();
-    void statecheck() const;
-    void updateParticlePhases() const;
-    bool hasIdleParticleInLoop;
-    bool idleStateUpdated;
-    bool markerStateTransition;
-    bool hasMarkerParticles;
-    bool hasCompletedhandleMoveToTargetTree() const;
-    bool hasCompletedInitializeTrees() const;
     virtual void processactivateHex();
-    //virtual void leaderElection();
-    //NON-IMMO state change
-    //void changeStateOfNonImmobilizedParticles();
-    //Get neighbour labels
-    //virtual std::vector<int> getNbrLabels() const;
-    virtual void activateLeader();
+    void updateParticleStates();
+    bool hasNbrWithFollowDir2Unset();
+    bool isImmobilized() const;
+    virtual void performMarkerMovement();
+    bool hasCompletedchangeIdleState() const;
+    bool hasCompletedperformMarkerMovement() const;
+    bool safeToMove() const;
+    bool isLeaf() const;
+    bool allDescendantsImmo() const;
+    bool isInLoopHelper(const Immobilizedparticles* root) const;
+    bool isInLoop() const;
     virtual void tryToBecomeLeader();
-    virtual void activateHex();
-    virtual int nextClockwiseDir(int inputDir);
-    virtual int nextCounterclockwiseDir(int inputDir) const;
-    int constructionReceiveDir() const;
-    // Checks whether this particle is occupying the next position to be filled.
-    bool canFinish() const;
-    // Sets this particle's constructionDir to point at the next position to be
-    // filled as it is finishing.
-    void updateConstructionDir();
-    // Updates this particle's moveDir when it is a leader to traverse the current
-    // surface of the forming shape counter-clockwise.
-    void updateMoveDir();
-    // Checks whether this particle has an immediate child in the spanning tree
-    // following its tail.
-    bool hasTailFollower() const;
+    std::vector<int> childLabels() const;
+    std::vector<int> childLabels2() const;
     virtual void passLeaderToken(const int label);
     virtual void performMovement();
-    //virtual void connectCluster();
+    virtual bool hasBlockingTailNbr() const;
     bool areAllMarkerAndIdleParticlesFollowers();
-    virtual void performMovement2();
-    virtual int getLineChildParticleLabel();
-
-    bool isInLoopHelper(const Immobilizedparticles* root) const;
-    bool isInLoop() const ;
-
-
-
-    // virtual void moveMarkerParticles();
-    // virtual void moveSingleMarkerParticle();
-
-    bool hasMarkerDescendant() const ;
-    bool allDescendantsImmo() const;
-    bool safeToMove() const;
-    bool allIdleParticlesTransitioned();
-    //bool checkAndSwitchToHexagonFormationPhase() const;
-    virtual void moveAwayTargettree();
-    //virtual void updateMoveDir();
+    void moveAwayTargettree();
+    bool checkAndSwitchToHexagonFormationPhase() const;
+    virtual int nextClockwiseDir(int inputDir);
+    virtual int nextCounterclockwiseDir(int inputDir) const;
     virtual std::vector<int> randLabels();
     virtual std::vector<int> randLabelsHead();
+    virtual QString inspectionText() const;
 
-    virtual bool hasBlockingTailNbr() const;
+    // Particle state attributes
+    bool isImmo;
+    bool isIdle;
+    bool tree2Ack;
+    bool canFinish() const;
+    int constructionReceiveDir() const;
+    void updateConstructionDir();
+    void updateMoveDir();
+    bool hasTailFollower() const;
+
     // Functions for altering a particle's cosmetic appearance.
-    // particleColor returns the color to be used for the particle.
-    // headMarkColor (respectively, tailMarkColor) returns the color to be used for the ring
-    // drawn around the head (respectively, tail) node. Tail color is not shown
-    // when the particle is contracted. headMarkDir returns the label of the port
-    // on which the black head marker is drawn.
     virtual int particleColor() const;
     virtual int headMarkColor() const;
     virtual int headMarkDir() const;
     virtual int tailMarkColor() const;
-    // Returns the string to be displayed when this particle is inspected; used
-    // to snapshot the current values of this particle's memory at runtime.
-    virtual QString inspectionText() const;
-    // Returns the _borderColors array associated with the
-    // particle to draw the boundaries of the line.
     virtual std::array<int, 18> borderColors() const;
-    // Returns the _borderPointColors array associated with the
-    // particle to draw the directions of the token.
     virtual std::array<int, 6> borderPointColors() const;
-    // Updates the _borderColors and the _borderPointColors arrays.
     virtual std::array<int, 18> leaderborderColorLabels() const;
     virtual std::array<int, 6> leaderborderPointColorLabels() const;
+
+    // Updates border colors
     void updateBorderColors();
     void updateBorderPointColors();
-    //void updateAllBorderPointColors();
-    // Gets a reference to the neighboring particle incident to the specified port
-    // label. Crashes if no such particle exists at this label; consider using
-    // hasNbrAtLabel() first if unsure.
+
+    // Gets a reference to the neighboring particle incident to the specified port label.
     Immobilizedparticles& nbrAtLabel(int label) const;
-    //virtual int labelOfFirstNbrInState(std::initializer_list<State> states, int startLabel, bool ignoreErrorParticles) const;
-    // Returns the label of the first port incident to a neighboring particle in
-    // any of the specified states, starting at the (optionally) specified label
-    // and continuing clockwise.
-    // int labelOfFirstNbrInState(std::initializer_list<State> states, int startLabel = 0, bool ignoreImmobParticles = true) const;
+
+    // Returns the label of the first port incident to a neighboring particle in any of the specified states.
     virtual int labelOfFirstNbrInState(std::initializer_list<State> states, int startLabel = 0, bool ignoreImmobParticles = true) const;
+
     // Checks whether this particle has a neighbor in any of the given states.
     bool hasNbrInState(std::initializer_list<State> states) const;
+
     int nextHexagonDir(int orientation) const;
     bool canRetire() const;
     bool hasTailChild() const;
-    const std::vector<int>  conTailChildLabels() const;
-    //     // int constructionReceiveDir() const;
-    //     //bool doesEnclosureOccur(std::set<Node>& occupied, Node testNode);
+    const std::vector<int> conTailChildLabels() const;
+
     // Checks whether this particle's state is one of the given states.
     bool isInState(std::initializer_list<State> states) const;
-    //void setState(State newState);
-    //for parent-childtree
-    // void setParent(Immobilizedparticles* parent) {
-    //     this->parent = parent;
-    // }
-    // void addChild(Immobilizedparticles* child) {
-    //     this->children.push_back(child);
-    // }
-    //void updateConstructionDir();
-    // bool canFinish() const;
-    // bool hasTailFollower() const;
-    // Returns the label associated with the direction which the next (resp.
-    // previous) agent is according to the cycle that the agent is on (which is
-    // determined by the provided agentDir parameter).
+    void setState(State newState);
+    bool areAllParticlesInTargetStates() const;
+
+    // Returns the direction of the next (resp. previous) agent.
     int getNextAgentDir(const int agentDir) const;
     int getPrevAgentDir(const int agentDir) const;
-    // Returns a count of the number of particle neighbors surrounding the calling
-    // particle.
-    int getNumberOfNbrs() const;
-//etter for state
-    void setState(State newState) {
-        state = newState;
-    }
 
-    // Getter for state
-    State getState() const {
-        return state;
-    }
+    // Returns a count of the number of particle neighbors surrounding the calling particle.
+    int getNumberOfNbrs() const;
+
+    // Activation methods for the leader and hexagon formation
+    virtual void activateLeader();
+    virtual void activateHex();
+
 protected:
     // General state of this particle.
     State state;
-    int _parentDir;   // Corresponds to "parent" in paper.
+
+    // Direction information
+    int _parentDir;         // Corresponds to "parent" in the paper.
     int _hexagonDir;
-    QOpenGLFunctions_2_0* glfn;
-    // Line recovery specific variables of this particle:
-    // Movement direction markers for the Leader and Followers.
-    int moveDir;
+    int moveDir;           // Movement direction markers for the Leader and Followers.
     int label;
     int followDir;
     int followDir1;
@@ -237,29 +151,30 @@ protected:
     int followDir2reverse;
     int constructionDir;
 
+    // OpenGL functions
+    QOpenGLFunctions_2_0* glfn;
+
+    // Connection and acknowledgment states
+    bool connected;
+    bool allChildrenAck;
+
+    // List of particles
     std::vector<Particle*> particles;
 
+    // Token for leader election
+    bool leaderToken;                         // Token to be passed around when a new Leader is required.
+    int tokenForwardDir;                     // Arbitrarily chosen 'goal' direction of the leader token.
+    int tokenCurrentDir;                     // Current direction the token is pointing towards.
 
-    // Token to be passed around when a new Leader is required.
-    bool leaderToken;
-    // Arbitrarily chosen 'goal' direction of the leader token. Like in the Pledge algorithm,
-    // this is the token's ultimate destination direction.
-    int tokenForwardDir;
-    // Current direction that the token is pointing towards. If this direction marker does
-    // not match the tokenForwardDir, the token's particle moves along the object closest to
-    // the right of tokenCurrentDir.
-    int tokenCurrentDir;
-    // Ignore objects around the particle and pass the leader token forwards unless there
-    // is no space.
-    bool passForward;
-    // Bool that marks whether a particle and all its children are 'free' from the objects.
-    bool freeState;
-    // Bool that marks whether a particle and all its children form a line.
-    bool lineState;
-    // _borderColorsSet and _borderColors are used to draw the boundaries of the hexagon layers.
-    bool _borderColorsSet;
-    // std::array<int, 18> _borderColors;
-    // std::array<int, 6> _borderPointColors;
+    // Forwarding and state flags
+    bool passForward;                         // Ignore objects and pass the leader token forwards unless there is no space.
+    bool freeState;                           // Marks whether the particle and all its children are 'free' from the objects.
+    bool lineState;                           // Marks whether the particle and all its children form a line.
+
+    // Color boundaries for hexagon layers
+    bool _borderColorsSet;                    // Used to draw the boundaries of the hexagon layers.
+
+
     // The LeaderElectionToken struct provides a general framework of any token
     // under the General Leader Election algorithm.
     struct LeaderElectionToken : public Token {
@@ -366,10 +281,6 @@ protected:
         }
     };
 private:
-
-
-
-
 
     friend class ImmobilizedParticleSystem;
     // The nested class LeaderElectionAgent is used to define the behavior for the
@@ -521,41 +432,37 @@ private:
         virtual void paintFrontSegment(const int color);
         virtual void paintBackSegment(const int color);
     };
-    // friend class LeaderElectionSystem;
-    // Immobilizedparticles* parent;
-    // std::vector<Immobilizedparticles*> children;
+
 protected:
     unsigned int currentAgent;
     std::vector<ImmoLeaderElectionAgent*> agents;
     std::array<int, 18> _leaderborderColorLabels;
     std::array<int, 6> _leaderborderPointColorLabels;
 };
-class ImmobilizedParticleSystem : public AmoebotSystem  {
+
+
+
+
+
+
+class ImmobilizedParticleSystem : public AmoebotSystem {
 public:
-    // Constructs a system of ShapeFormationFaultTolerantParticles with an optionally specified
-    // size (#particles) and immobility rate, i.e. the probability for each particle to be
-    // immobilized in the initial configuration. The particles initially form a line.
-    ImmobilizedParticleSystem(int numParticles = 200, int numImmoParticles = 200, int genExpExample = 0, int numCoinFlips = 20);
-    void printAllParticleStates() const;
-    void setParticlesToImmobilized();
+    // Constructs a system of Immobilized and Non-immobilized Particles with an optionally specified
+    // size (#particles) in the initial configuration.
+    ImmobilizedParticleSystem(int numParticles = 200,
+                              int numImmoParticles = 200,
+                              int genExpExample = 0,
+                              int numCoinFlips = 20);
+
+    // Returns the particles in the system.
     const std::vector<AmoebotParticle*>& getParticles() const {
         return particles;
     }
-
-
-
-    void particleStatechange();
-    void updateParticleStates();
-    bool updateParticleStates2();
-    bool hasCompletedActivateLeader() const;
-    bool hasCompletedMoveToTargetTree() const;
-    void updateBorderPointColors();
-    void updateAllBorderPointColors();
     bool checkAndSwitchToHexagonFormationPhase();
-    // Checks whether or not the system's run of the ShapeFormation formation
+
+    // Checks whether or not the system's run of the Hexagon formation
     // algorithm has terminated (all particles finished).
-    bool hasLeader () const;
-    bool areAllParticlesInTargetStates() const;
     bool hasTerminated() const override;
 };
+
 #endif // Immobilizedparticles_H
