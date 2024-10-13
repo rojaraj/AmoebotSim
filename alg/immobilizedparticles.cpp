@@ -55,7 +55,7 @@ void Immobilizedparticles::activate() {
         break;
 
     case Phase::LeaderMovement:
-        processParticlesWithLeaderToken(); // Moving leader and followers away from immobilized particles
+        performLeaderMovement(); // Moving leader and followers away from immobilized particles
         break;
 
     case Phase::HexagonFormation:
@@ -1522,7 +1522,7 @@ bool Immobilizedparticles::hasCompletedperformMarkerMovement() const {
 
 
 
-void Immobilizedparticles::processParticlesWithLeaderToken() {
+void Immobilizedparticles::performLeaderMovement() {
     // Check if all particles in the neighborhood are in target states
     if (areAllParticlesInTargetStates()) {
         if (leaderToken) {

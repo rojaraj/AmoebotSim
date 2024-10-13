@@ -54,7 +54,7 @@ public:
     virtual void startLeaderElection();
     virtual void initializeTrees();
     virtual void changeIdleState();
-    virtual void processParticlesWithLeaderToken();
+    virtual void performLeaderMovement();
     virtual void processactivateHex();
     void updateParticleStates();
     bool hasNbrWithFollowDir2Unset();
