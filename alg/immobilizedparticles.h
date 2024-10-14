@@ -27,7 +27,8 @@ public:
         Candidate,      // For leader election
         SoleCandidate,
         Demoted,
-        Finished
+        Finished,
+        MRetired
     };
 
     // Enum representing the phases of the formation algorithm

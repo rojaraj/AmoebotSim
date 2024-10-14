@@ -1477,8 +1477,8 @@ std::vector<int> Immobilizedparticles::childLabels2() const {
     for (int label : uniqueLabels()) {
         if (hasNbrAtLabel(label)) {
             const auto& nbr = nbrAtLabel(label);
-            if(nbr.followDir2 != -1){
-                if (pointsAtMe(nbr, nbr.dirToHeadLabel(nbr.followDir2))) {
+            if (0 <= nbr.followDir2 && nbr.followDir2 < 6){
+                if (pointsAtMe(nbr, nbr.followDir2)) {
                     children.push_back(label);
                 }
             }
@@ -1510,6 +1510,11 @@ bool Immobilizedparticles::hasCompletedperformMarkerMovement() const {
     }
     return true;
 }
+void Immobilizedparticles::setState(State newState) {
+    // Update the state of the particle
+    state = newState;
+}
+
 
 
 
@@ -1695,23 +1700,56 @@ bool Immobilizedparticles::hasBlockingTailNbr() const {
 }
 
 
+
 bool Immobilizedparticles::areAllMarkerAndIdleParticlesFollowers() {
-    auto* immobilizedSystem = dynamic_cast<ImmobilizedParticleSystem*>(&system);
-    if (!immobilizedSystem) {
+    // Check if the current particle is in the Marker or Idle state
+    if (isInState({State::Marker})) {
         return false;
     }
 
-    for (const auto& particle : immobilizedSystem->getParticles()) {
-        auto* immobileParticle = dynamic_cast<Immobilizedparticles*>(particle);
-        if (immobileParticle) {
-            if (immobileParticle->isInState({State::Marker, State::Idle})) {
-                return false;
+    // Temporarily mark this particle to avoid revisiting it
+    State originalState = state;
+    setState(State::MRetired); // Use a temporary state to mark as visited
+
+    // Get the child labels
+    auto children = childLabels2();
+
+    // If there are no children, return true as there's nothing to check
+    if (children.empty()) {
+        // Restore the original state before returning
+        setState(originalState);
+        return true;
+    }
+
+    // Iterate through child labels
+    for (int label : children) {
+        // Check if there is a neighboring particle at the current label
+        if (hasNbrAtLabel(label)) {
+            // Get the child particle at the current label
+            auto& child = nbrAtLabel(label);
+
+            // If the child particle is already marked (visited), continue to the next child
+            if (child.isInState({State::MRetired})) {
+                continue;
             }
 
+            // Recursively check if all descendants of the child particle are in the correct state
+            if (!child.areAllMarkerAndIdleParticlesFollowers()) {
+                // Restore the original state before returning
+                setState(originalState);
+                return false;
+            }
         }
     }
+
+    // Restore the original state before returning
+    setState(originalState);
+
+    // If all children and their descendants are not in the Marker or Idle state, return true
     return true;
 }
+
+
 
 
 void Immobilizedparticles::moveAwayTargettree() {
