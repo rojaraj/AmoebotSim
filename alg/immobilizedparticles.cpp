@@ -39,7 +39,7 @@ Immobilizedparticles::Immobilizedparticles(const Node head,
 }
 
 void Immobilizedparticles::activate() {
-    updateParticleStates();
+    updateParticleStatesAndPhases();
 
     switch (phase) {
     case Phase::LeaderElection:
@@ -77,7 +77,7 @@ void Immobilizedparticles::activate() {
 
 void Immobilizedparticles::startLeaderElection(){
 
-    updateParticleStates();
+    updateParticleStatesAndPhases();
 
     if (isInState({State::Immo})) {
         state = State::Idle;
@@ -151,10 +151,8 @@ void Immobilizedparticles::activateLeader(){
             state = State::Finished;
         }
     }
-    if(isInState({State::Leader}) || isInState({State::Finished}))
-    {
-        phase = Phase::InitializeTrees;
-    }
+    updateParticleStatesAndPhases();
+
     return;
 }
 
@@ -1021,7 +1019,7 @@ void Immobilizedparticles::ImmoLeaderElectionAgent::paintBackSegment(const int c
 void Immobilizedparticles::initializeTrees() {
 
     // Update the states of all particles
-    updateParticleStates();
+    updateParticleStatesAndPhases();
 
     for (int label : uniqueLabels()) {   // Iterate over random labels
         if (hasNbrAtLabel(label)) {
@@ -1384,9 +1382,10 @@ void Immobilizedparticles::performMarkerMovement() {
     }
 
     // Transition to the next phase if movement is complete
-    if (hasCompletedperformMarkerMovement()) {
-        phase = Phase::LeaderMovement;
-    }
+    updateParticleStatesAndPhases();
+    // if (hasCompletedperformMarkerMovement()) {
+    //     phase = Phase::LeaderMovement;
+    // }
 }
 
 
@@ -1994,7 +1993,7 @@ int Immobilizedparticles::constructionReceiveDir() const {
 //----------------------------Additional Functions----------------------------
 
 
-void Immobilizedparticles::updateParticleStates() {
+void Immobilizedparticles::updateParticleStatesAndPhases() {
     // Update particle state for LeaderElection phase
     if (phase == Immobilizedparticles::Phase::LeaderElection) {
         for (int label : uniqueLabels()) {
@@ -2010,6 +2009,12 @@ void Immobilizedparticles::updateParticleStates() {
             }
         }
     }
+    // Update particle states to InitializeTrees phase
+    if(phase == Immobilizedparticles::Phase::LeaderElection){
+    if(isInState({State::Leader}) || isInState({State::Finished}))
+    {
+        phase = Phase::InitializeTrees;
+    }}
 
     // Update particle states for InitializeTrees phase
     if (phase == Immobilizedparticles::Phase::InitializeTrees) {
@@ -2022,13 +2027,17 @@ void Immobilizedparticles::updateParticleStates() {
         }
     }
 
-    // Check if all particles have valid followDir2
-    //bool allParticlesHaveValidFollowDir2 = (followDir2 != -1);
 
     // If followDir2 is valid, transition to CompleteTargetTree phase
     if (followDir2 != -1) {
         if (phase == Immobilizedparticles::Phase::InitializeTrees) {
             phase = Immobilizedparticles::Phase::CompleteTargetTree;
+        }
+    }
+
+    if(state != Immobilizedparticles::State::Idle && phase == Immobilizedparticles::Phase::CompleteTargetTree){
+        if (hasCompletedperformMarkerMovement()) {
+            phase = Phase::LeaderMovement;
         }
     }
 }

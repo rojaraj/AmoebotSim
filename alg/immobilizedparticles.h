@@ -56,7 +56,7 @@ public:
     virtual void changeIdleState();
     virtual void performLeaderMovement();
     virtual void processactivateHex();
-    void updateParticleStates();
+    void updateParticleStatesAndPhases();
     bool hasNbrWithFollowDir2Unset();
     bool isImmobilized() const;
     virtual void performMarkerMovement();
